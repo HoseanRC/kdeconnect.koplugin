@@ -28,54 +28,6 @@ local function tablelength(T)
     return count
 end
 
-local CERT_PEM = [[-----BEGIN CERTIFICATE-----
-MIIDBzCCAe+gAwIBAgIUH+KS+f0YAM1Zke5vhors+8IwK0MwDQYJKoZIhvcNAQEL
-BQAwEzERMA8GA1UEAwwIa29yZWFkZXIwHhcNMjYwNjI0MTEyNDQxWhcNMzYwNjIx
-MTEyNDQxWjATMREwDwYDVQQDDAhrb3JlYWRlcjCCASIwDQYJKoZIhvcNAQEBBQAD
-ggEPADCCAQoCggEBAKn0qb41FeWVnacOfsgwhLDe8WC7nXwqrwIHcgm/vSpUrTwC
-/7a9LO2xFioX36ui7QGVotzdFYIrni9y2BNjiV1AsGoI2yaf/iRVVPMGQMrsT8Bu
-1YSrPz8sB57UqBUZdfF1Lz2pyCuivtQFnTdFyZEy1jtG5RuOJc24rqH8Yjnx/f2S
-TlADOc0R6qdZ5VfR2j3LJh4LIE1O6lCzR3kZPesYil9i08lnI/AtnKqw5zUVH4++
-ls0JM2Tguix5PWvcv9Vmfj6e7yU0u1IXK+hN3U/lBheHspfhpetRzRUGiGySoVSJ
-C3/OaBlSWDNvWbYJF1T0zrVf1VdT38IJwpyAepECAwEAAaNTMFEwHQYDVR0OBBYE
-FMl/UIarqTsFRAjIlvej4q7UjfslMB8GA1UdIwQYMBaAFMl/UIarqTsFRAjIlvej
-4q7UjfslMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAI5VaCZ1
-6nMr0dWNaVQ/h2tqBGnD8LLypsJs6jKnFqzrE+ugqZsiCXBElAamGspvPUuVBGS1
-0LCeo7GwdpRCtvJ7CEIxmkjNyC1XWnT02xgHE9/GfNfw/FRy99KXJxpY+YGoguAr
-csptgWFnhfqdPQm7RNqZkF8Z6zd9gcExTeDReh8dlBljtHdRK16QbaLl86c7kolE
-0mHM9xFJrZb2iFpXWl3pjRmhRuGJQEvOqnYXvZ7P74leVTYWK1e5CcXL9/hDCdww
-HFNYk1DtZdl5ApwQmoC61RqJ1F6Wl2ZifVF853GLJ7WWdQ6dTlkrIKQPIPdTlP53
-bMZHjuhGhrmRu4o=
------END CERTIFICATE-----]]
-
-local KEY_PEM = [[-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCp9Km+NRXllZ2n
-Dn7IMISw3vFgu518Kq8CB3IJv70qVK08Av+2vSztsRYqF9+rou0BlaLc3RWCK54v
-ctgTY4ldQLBqCNsmn/4kVVTzBkDK7E/AbtWEqz8/LAee1KgVGXXxdS89qcgror7U
-BZ03RcmRMtY7RuUbjiXNuK6h/GI58f39kk5QAznNEeqnWeVX0do9yyYeCyBNTupQ
-s0d5GT3rGIpfYtPJZyPwLZyqsOc1FR+PvpbNCTNk4LoseT1r3L/VZn4+nu8lNLtS
-FyvoTd1P5QYXh7KX4aXrUc0VBohskqFUiQt/zmgZUlgzb1m2CRdU9M61X9VXU9/C
-CcKcgHqRAgMBAAECggEADcOKMaTD8rVksKBMZTMEs/xCKRbYoLMmPDBVLHPyQmjc
-JLWLdwWoC1HhnSQU0aYespenOmLPOJ0GsQoIdL2FZN91ygiQkva3EsM0X4AcpDJy
-HP/828MwmpGaxmKrgBXxRs46NrC2zM3fzXTs8Ap/Ufp/fgp2SH6BEkGIJwc0/0M3
-ghqNn8l3myXK1sNrOrSVV+tfhlyle01P72A5r1bjMY9Ef1rnQbSKm1asyOUlUqfu
-A5lnW7eQZ7Z+NhOYn1JU99Cuiddtf3gvaZBYkVfC7A9AmCWmUC6YBq8KFvYz9hCv
-E24cYwiT/HI6aOzbHwqgbL7VPu9tgXFmtWSNxn3gyQKBgQDZItkqjO1vISfqQXZb
-iIv1Sj6Nk2eSxNKnI1TdgHSbWWoCXHMQUDwanpMW/yGb6Zf3ghRSF9dZ3MGTSLU5
-wMmudqICwQTX5ZP6VcTRPUeHSwzmTb44waQgQH+EblbssojYpuYGvfqpQPDuGcmY
-WSxgvuFhjofk5R8dCzBRo71XFQKBgQDIYAONnlOh4mxH/4ZNlX+H+xyHGADeTYec
-KME3tW0RfB+KOWvW1XkQONJxbsnpXbWCXpS7730i9D4GbNSxjfGOPW5LwygM1cU5
-Y42mrNd9BkI7Ebc4rm2NhBYu/aMYa/08gX53YJ0rDmRQvvrDzbFaUkuSHCCU+i5i
-7qSeCzp0jQKBgQCtiN1Y1WKZEz2MSZ8nDl0Uv654hZscQHM+os0bbaND2NURaAOJ
-wSYX/C4ADg01Rx5t8Cb/aRByQCzw4gX8TyigZy2Z19tgFJoMUunGdBwrc36uvOlP
-AOuD3yhKlcigyRr3U4O5VbHz/PPQxwlH2dTOyR7lUf0noToZgyytwpf69QKBgQCS
-+IniqEzjoraVoMEbyxn93ZwxItQQOoHLcsE2YWacupRPyIpmy7G+yk7hUMfc2hU2
-iLVDnAgHSWrtP4pKqbiSAlESVRTdRTciPvk5VfHBDIQr23SuqJJGiKnU0cl9MkhO
-xxTB7yWY3TeLWmmIkSkS/OXdR7BGVbMMccpg+g9oSQKBgAG6lneUFOaiBrhBAHwm
-5086XIHQs57apAVdXkKS0swo/icXQE8mqKmGd+PWzGCIaTW1FQ23WgM7kWp2L7Su
-s1f5oPxWClD9Ryc6SCTV4VKI3Frx22opcN0Fdhkw2ajtW4+wZmilW60zFUGeJseA
-ZUI/ikswbH3CMAugUZpSkhSl
------END PRIVATE KEY-----]]
 
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
@@ -94,8 +46,8 @@ local KDEConnectPlugin = WidgetContainer:extend {
     paired_devices = {},
     tcp_server = nil,
     plugin_dir = nil,
-    tls_cert = nil,
-    tls_key = nil,
+    tls_cert = "/sdcard/koreader/plugins/kdeconnect.koplugin/cert.pem",
+    tls_key = "/sdcard/koreader/plugins/kdeconnect.koplugin/key.pem",
 }
 
 local function values(t)
@@ -175,14 +127,6 @@ function KDEConnectPlugin:_generate_device_id()
         id = id .. string.format("%x", math.random(0, 15))
     end
     return id
-end
-
-function KDEConnectPlugin:_ensure_certificate()
-    local ok, cert = pcall(ssl.loadcertificate, CERT_PEM)
-    if ok then
-        self.tls_cert = cert
-        self.tls_key = KEY_PEM
-    end
 end
 
 function KDEConnectPlugin:_encode(packet)
@@ -328,30 +272,37 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     local client_id = body.deviceId
     local client_proto = body.protocolVersion or 7
     local tls, err = self:_wrap_server_tls(client)
-    self.udp_socket:sendto("tls err: " .. err .. "\n", "10.169.63.146", 11111)
+    self.udp_socket:sendto("tls err: " .. (err and err or "no error") .. "\n", "10.169.63.146", 11111)
     if not tls then
         self.udp_socket:sendto("tls failed\n", "10.169.63.146", 11111)
         client:close()
         return
     end
-    local full = self:_create_full_identity()
+    local ok, err = tls:dohandshake()
+    self:_print((ok and "OK" or "NOTOK") .. " " .. (err or ""))
     self.udp_socket:sendto("#5 tcp\n", "10.169.63.146", 11111)
+    local full = self:_create_full_identity()
+
     tls:send(full .. "\n")
-    tls:settimeout(5)
+    self.udp_socket:sendto("#6 tcp\n", "10.169.63.146", 11111)
+    tls:settimeout(0)
     local remote_line = tls:receive("*l")
+    self.udp_socket:sendto("#7 " .. (remote_line or "NODATA") .. "\n", "10.169.63.146", 11111)
     if not remote_line then
         tls:close()
         client:close()
         return
     end
-    self.udp_socket:sendto("#6 tcp\n", "10.169.63.146", 11111)
+    self.udp_socket:sendto("#8 tcp\n", "10.169.63.146", 11111)
     local remote_pkt = self:_decode(remote_line)
     if not remote_pkt or remote_pkt.type ~= "kdeconnect.identity" then
         tls:close()
         client:close()
         return
     end
-    self.udp_socket:sendto("#7 tcp\n", "10.169.63.146", 11111)
+
+    local packet_str = self:_create_discovery_packet()
+    tls:send(packet_str)
     local remote = remote_pkt.body
     local dev = {
         ip = client:getpeername(),
@@ -376,13 +327,20 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
 end
 
 function KDEConnectPlugin:_wrap_server_tls(client)
-    return ssl.wrap(client, {
-        mode = "server",
+    self.udp_socket:sendto("#check: " .. self.tls_cert .. "\n", "10.169.63.146", 11111)
+    -- self.udp_socket:sendto("#check: " .. io.open(self.tls_cert, "rb"):read("a") .. "\n", "10.169.63.146", 11111)
+    self.udp_socket:sendto("#check: " .. self.tls_key .. "\n", "10.169.63.146", 11111)
+    -- self.udp_socket:sendto("#check: " .. io.open(self.tls_key, "rb"):read("a") .. "\n", "10.169.63.146", 11111)
+    local tls, err = ssl.wrap(client, {
+        mode = "client",
         protocol = "tlsv1_2",
         certificate = self.tls_cert,
         key = self.tls_key,
         verify = "none",
     })
+    self.udp_socket:sendto("#check: YES\n", "10.169.63.146", 11111)
+    self.udp_socket:sendto("#check: " .. type(err) .. "\n", "10.169.63.146", 11111)
+    return tls, err
 end
 
 function KDEConnectPlugin:_create_full_identity()
@@ -447,7 +405,9 @@ function KDEConnectPlugin:connect_to_device(device_id)
         UIManager:show(InfoMessage:new { text = "TLS handshake failed" })
         return
     end
+
     local full = self:_create_full_identity()
+
     tls:send(full .. "\n")
     self.connections[device_id] = {
         tcp = tcp,
@@ -587,11 +547,14 @@ function KDEConnectPlugin:_handle_echo(body)
     UIManager:show(InfoMessage:new { text = "Echo: " .. json.encode(body) })
 end
 
+function KDEConnectPlugin:_print(a)
+    self.udp_socket:sendto(a .. "\n", "10.169.63.146", 11111)
+end
+
 -- ──────────────────────────── Init ────────────────────────────
 
 function KDEConnectPlugin:init()
     self:_load_or_create_identity()
-    self:_ensure_certificate()
     self:start_discovery()
     self:start_tcp_server()
 end
