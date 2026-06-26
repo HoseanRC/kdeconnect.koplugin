@@ -5,6 +5,77 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local InfoMessage = require("ui/widget/infomessage")
 local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
+-- local posix = require("posix")
+
+local function log(data)
+    UIManager:show(InfoMessage:new {
+        text = data,
+    })
+end
+
+local function contains(table, val)
+    for i = 1, #table do
+        if table[i] == val then
+            return true
+        end
+    end
+    return false
+end
+
+local function tablelength(T)
+    local count = 0
+    for _ in pairs(T) do count = count + 1 end
+    return count
+end
+
+local CERT_PEM = [[-----BEGIN CERTIFICATE-----
+MIIDBzCCAe+gAwIBAgIUH+KS+f0YAM1Zke5vhors+8IwK0MwDQYJKoZIhvcNAQEL
+BQAwEzERMA8GA1UEAwwIa29yZWFkZXIwHhcNMjYwNjI0MTEyNDQxWhcNMzYwNjIx
+MTEyNDQxWjATMREwDwYDVQQDDAhrb3JlYWRlcjCCASIwDQYJKoZIhvcNAQEBBQAD
+ggEPADCCAQoCggEBAKn0qb41FeWVnacOfsgwhLDe8WC7nXwqrwIHcgm/vSpUrTwC
+/7a9LO2xFioX36ui7QGVotzdFYIrni9y2BNjiV1AsGoI2yaf/iRVVPMGQMrsT8Bu
+1YSrPz8sB57UqBUZdfF1Lz2pyCuivtQFnTdFyZEy1jtG5RuOJc24rqH8Yjnx/f2S
+TlADOc0R6qdZ5VfR2j3LJh4LIE1O6lCzR3kZPesYil9i08lnI/AtnKqw5zUVH4++
+ls0JM2Tguix5PWvcv9Vmfj6e7yU0u1IXK+hN3U/lBheHspfhpetRzRUGiGySoVSJ
+C3/OaBlSWDNvWbYJF1T0zrVf1VdT38IJwpyAepECAwEAAaNTMFEwHQYDVR0OBBYE
+FMl/UIarqTsFRAjIlvej4q7UjfslMB8GA1UdIwQYMBaAFMl/UIarqTsFRAjIlvej
+4q7UjfslMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAI5VaCZ1
+6nMr0dWNaVQ/h2tqBGnD8LLypsJs6jKnFqzrE+ugqZsiCXBElAamGspvPUuVBGS1
+0LCeo7GwdpRCtvJ7CEIxmkjNyC1XWnT02xgHE9/GfNfw/FRy99KXJxpY+YGoguAr
+csptgWFnhfqdPQm7RNqZkF8Z6zd9gcExTeDReh8dlBljtHdRK16QbaLl86c7kolE
+0mHM9xFJrZb2iFpXWl3pjRmhRuGJQEvOqnYXvZ7P74leVTYWK1e5CcXL9/hDCdww
+HFNYk1DtZdl5ApwQmoC61RqJ1F6Wl2ZifVF853GLJ7WWdQ6dTlkrIKQPIPdTlP53
+bMZHjuhGhrmRu4o=
+-----END CERTIFICATE-----]]
+
+local KEY_PEM = [[-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCp9Km+NRXllZ2n
+Dn7IMISw3vFgu518Kq8CB3IJv70qVK08Av+2vSztsRYqF9+rou0BlaLc3RWCK54v
+ctgTY4ldQLBqCNsmn/4kVVTzBkDK7E/AbtWEqz8/LAee1KgVGXXxdS89qcgror7U
+BZ03RcmRMtY7RuUbjiXNuK6h/GI58f39kk5QAznNEeqnWeVX0do9yyYeCyBNTupQ
+s0d5GT3rGIpfYtPJZyPwLZyqsOc1FR+PvpbNCTNk4LoseT1r3L/VZn4+nu8lNLtS
+FyvoTd1P5QYXh7KX4aXrUc0VBohskqFUiQt/zmgZUlgzb1m2CRdU9M61X9VXU9/C
+CcKcgHqRAgMBAAECggEADcOKMaTD8rVksKBMZTMEs/xCKRbYoLMmPDBVLHPyQmjc
+JLWLdwWoC1HhnSQU0aYespenOmLPOJ0GsQoIdL2FZN91ygiQkva3EsM0X4AcpDJy
+HP/828MwmpGaxmKrgBXxRs46NrC2zM3fzXTs8Ap/Ufp/fgp2SH6BEkGIJwc0/0M3
+ghqNn8l3myXK1sNrOrSVV+tfhlyle01P72A5r1bjMY9Ef1rnQbSKm1asyOUlUqfu
+A5lnW7eQZ7Z+NhOYn1JU99Cuiddtf3gvaZBYkVfC7A9AmCWmUC6YBq8KFvYz9hCv
+E24cYwiT/HI6aOzbHwqgbL7VPu9tgXFmtWSNxn3gyQKBgQDZItkqjO1vISfqQXZb
+iIv1Sj6Nk2eSxNKnI1TdgHSbWWoCXHMQUDwanpMW/yGb6Zf3ghRSF9dZ3MGTSLU5
+wMmudqICwQTX5ZP6VcTRPUeHSwzmTb44waQgQH+EblbssojYpuYGvfqpQPDuGcmY
+WSxgvuFhjofk5R8dCzBRo71XFQKBgQDIYAONnlOh4mxH/4ZNlX+H+xyHGADeTYec
+KME3tW0RfB+KOWvW1XkQONJxbsnpXbWCXpS7730i9D4GbNSxjfGOPW5LwygM1cU5
+Y42mrNd9BkI7Ebc4rm2NhBYu/aMYa/08gX53YJ0rDmRQvvrDzbFaUkuSHCCU+i5i
+7qSeCzp0jQKBgQCtiN1Y1WKZEz2MSZ8nDl0Uv654hZscQHM+os0bbaND2NURaAOJ
+wSYX/C4ADg01Rx5t8Cb/aRByQCzw4gX8TyigZy2Z19tgFJoMUunGdBwrc36uvOlP
+AOuD3yhKlcigyRr3U4O5VbHz/PPQxwlH2dTOyR7lUf0noToZgyytwpf69QKBgQCS
++IniqEzjoraVoMEbyxn93ZwxItQQOoHLcsE2YWacupRPyIpmy7G+yk7hUMfc2hU2
+iLVDnAgHSWrtP4pKqbiSAlESVRTdRTciPvk5VfHBDIQr23SuqJJGiKnU0cl9MkhO
+xxTB7yWY3TeLWmmIkSkS/OXdR7BGVbMMccpg+g9oSQKBgAG6lneUFOaiBrhBAHwm
+5086XIHQs57apAVdXkKS0swo/icXQE8mqKmGd+PWzGCIaTW1FQ23WgM7kWp2L7Su
+s1f5oPxWClD9Ryc6SCTV4VKI3Frx22opcN0Fdhkw2ajtW4+wZmilW60zFUGeJseA
+ZUI/ikswbH3CMAugUZpSkhSl
+-----END PRIVATE KEY-----]]
 
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
@@ -26,6 +97,37 @@ local KDEConnectPlugin = WidgetContainer:extend {
     tls_cert = nil,
     tls_key = nil,
 }
+
+local function values(t)
+    local i = 0
+    return function()
+        i = i + 1; return t[i]
+    end
+end
+
+-- ────────────────────────── Get IPs ───────────────────────────
+
+local function getips()
+    local ips = {}
+
+    local f = io.popen("ip -o -4 addr show")
+    if not f then
+        return ips
+    end
+    for line in f:lines() do
+        local ip = line:match("inet (%d+%.%d+%.%d+%.%d+)")
+        if ip then
+            table.insert(ips, ip)
+        end
+    end
+    f:close()
+
+    for _, ip in ipairs(ips) do
+        print(ip)
+    end
+
+    return ips
+end
 
 function KDEConnectPlugin:_get_plugin_dir()
     if not self.plugin_dir then
@@ -76,36 +178,10 @@ function KDEConnectPlugin:_generate_device_id()
 end
 
 function KDEConnectPlugin:_ensure_certificate()
-    local dir = self:_get_plugin_dir()
-    local cert_path = dir .. "cert.pem"
-    local key_path = dir .. "key.pem"
-    local cert = self:_read_file(cert_path)
-    local key = self:_read_file(key_path)
-    if cert and key then
-        local ok1, c = pcall(ssl.loadcert, cert_path)
-        local ok2, k = pcall(ssl.loadprivatekey, key_path)
-        if ok1 and ok2 then
-            self.tls_cert = c
-            self.tls_key = k
-            return
-        end
-    end
-    local subj = '/CN=' .. self.device_id
-    local cmd = 'openssl req -x509 -newkey rsa:2048 -keyout "' .. key_path
-        .. '" -out "' .. cert_path
-        .. '" -days 3650 -nodes -subj "' .. subj .. '" 2>/dev/null'
-    local ok = os.execute(cmd)
-    if ok ~= 0 then
-        UIManager:show(InfoMessage:new {
-            text = "Failed to generate TLS certificate",
-        })
-        return
-    end
-    local ok1, c = pcall(ssl.loadcert, cert_path)
-    local ok2, k = pcall(ssl.loadprivatekey, key_path)
-    if ok1 and ok2 then
-        self.tls_cert = c
-        self.tls_key = k
+    local ok, cert = pcall(ssl.loadcertificate, CERT_PEM)
+    if ok then
+        self.tls_cert = cert
+        self.tls_key = KEY_PEM
     end
 end
 
@@ -126,8 +202,15 @@ function KDEConnectPlugin:_create_discovery_packet()
         type = "kdeconnect.identity",
         body = {
             deviceId = self.device_id,
+            deviceName = "hoseanrc-kindle",
+            deviceType = "desktop",
             protocolVersion = self.protocol_version,
             tcpPort = self.tcp_port,
+            incomingCapabilities = {
+                "kdeconnect.notification",
+                "kdeconnect.ping"
+            },
+            outgoingCapabilities = {},
         },
     })
 end
@@ -143,35 +226,53 @@ function KDEConnectPlugin:_broadcast_presence()
     local packet_str = self:_create_discovery_packet()
     local ok = self.udp_socket:sendto(packet_str, "255.255.255.255", 1716)
     if ok then
-        UIManager:scheduleIn(5, function()
+        UIManager:scheduleIn(0.5, function()
             self:_receive_discovery_responses()
         end)
     end
 end
 
 function KDEConnectPlugin:_receive_discovery_responses()
-    local data, ip = self.udp_socket:receivefrom()
+    local data, ip, port = self.udp_socket:receivefrom()
+    local localIp, localPort = self.udp_socket:getsockname()
     while data do
         local packet = self:_decode(data)
-        if packet and packet.type == "kdeconnect.identity"
-            and packet.body and packet.body.deviceId ~= self.device_id then
-            local dev = packet.body
-            if not self.discovered_devices[dev.deviceId] then
-                dev.ip = ip
-                self.discovered_devices[dev.deviceId] = dev
-                UIManager:show(InfoMessage:new {
-                    text = "Discovered: " .. (dev.deviceName or dev.deviceId),
-                })
+        if packet and packet.body then
+            log("got UDP JSON from " .. ip)
+            if type(packet.body.outgoingCapabilities) == "table"
+                and tablelength(packet.body.outgoingCapabilities) > 0
+                and (not contains(getips(), ip)) then
+                local packet_str = self:_create_discovery_packet()
+                local ok = self.udp_socket:sendto(packet_str, ip, packet.tcpPort or 1716)
+            elseif packet.type == "kdeconnect.identity"
+                and packet.body and packet.body.deviceId ~= self.device_id then
+                -- UIManager:show(InfoMessage:new {
+                --     text = "packet: " .. packet.id .. " ok " .. (packet.id == 0 and "yes" or "no"),
+                -- })
+                local dev = packet.body
+                if not self.discovered_devices[dev.deviceId] then
+                    dev.ip = ip
+                    self.discovered_devices[dev.deviceId] = dev
+                    UIManager:show(InfoMessage:new {
+                        text = "Discovered: " .. (dev.deviceName or dev.deviceId),
+                    })
+                end
             end
+        else
+            log("got UDP Packet from " .. ip)
         end
         data, ip = self.udp_socket:receivefrom()
     end
+    UIManager:scheduleIn(0.5, function()
+        self:_receive_discovery_responses()
+    end)
 end
 
 -- ──────────────────────────── TCP Server ────────────────────────────
 
 function KDEConnectPlugin:start_tcp_server()
-    self.tcp_server = socket.tcp()
+    -- log("starting tcp")
+    self.tcp_server = socket.tcp4()
     self.tcp_server:setoption("reuseaddr", true)
     self.tcp_server:settimeout(0)
     local ok, err = self.tcp_server:setsockname("*", self.tcp_port)
@@ -188,42 +289,53 @@ function KDEConnectPlugin:start_tcp_server()
 end
 
 function KDEConnectPlugin:_poll_tcp_server()
+    -- log("tcp")
     local client = self.tcp_server:accept()
     while client do
+        log("connected")
+        self.udp_socket:sendto("connected tcp\n", "10.169.63.146", 11111)
         self:_handle_incoming_connection(client)
         client = self.tcp_server:accept()
     end
-    UIManager:scheduleIn(0.5, function()
+    UIManager:scheduleIn(0.1, function()
         self:_poll_tcp_server()
     end)
 end
 
 function KDEConnectPlugin:_handle_incoming_connection(client)
-    client:settimeout(5)
+    self.udp_socket:sendto("#1 tcp\n", "10.169.63.146", 11111)
+    client:settimeout(0)
     local line = client:receive("*l")
     if not line then
         client:close()
         return
     end
+    self.udp_socket:sendto("#2 tcp\n", "10.169.63.146", 11111)
+    log(line)
     local packet = self:_decode(line)
     if not packet or packet.type ~= "kdeconnect.identity"
         or not packet.body or not packet.body.deviceId then
         client:close()
         return
     end
+    self.udp_socket:sendto("#3 tcp\n", "10.169.63.146", 11111)
     local body = packet.body
     if body.targetDeviceId and body.targetDeviceId ~= self.device_id then
         client:close()
         return
     end
+    self.udp_socket:sendto("#4 tcp\n", "10.169.63.146", 11111)
     local client_id = body.deviceId
     local client_proto = body.protocolVersion or 7
-    local tls = self:_wrap_server_tls(client)
+    local tls, err = self:_wrap_server_tls(client)
+    self.udp_socket:sendto("tls err: " .. err .. "\n", "10.169.63.146", 11111)
     if not tls then
+        self.udp_socket:sendto("tls failed\n", "10.169.63.146", 11111)
         client:close()
         return
     end
     local full = self:_create_full_identity()
+    self.udp_socket:sendto("#5 tcp\n", "10.169.63.146", 11111)
     tls:send(full .. "\n")
     tls:settimeout(5)
     local remote_line = tls:receive("*l")
@@ -232,12 +344,14 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
         client:close()
         return
     end
+    self.udp_socket:sendto("#6 tcp\n", "10.169.63.146", 11111)
     local remote_pkt = self:_decode(remote_line)
     if not remote_pkt or remote_pkt.type ~= "kdeconnect.identity" then
         tls:close()
         client:close()
         return
     end
+    self.udp_socket:sendto("#7 tcp\n", "10.169.63.146", 11111)
     local remote = remote_pkt.body
     local dev = {
         ip = client:getpeername(),

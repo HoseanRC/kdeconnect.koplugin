@@ -1,5 +1,5 @@
 local _ = require("gettext")
 return {
-    fullname = _("Hello"),
-    description = _([[This is a debugging plugin.]]),
+    fullname = _("KDE Connect"),
+    description = _([[KDE Connect plugin for KOReader.]]),
 }
