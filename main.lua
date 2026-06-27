@@ -39,7 +39,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
 }
 
 function KDEConnectPlugin:_print(a)
-    self.udp_socket:sendto(a .. "\n", "10.169.63.146", 11111)
+    self.udp_socket:sendto(a .. "\n", "192.168.1.60", 11111)
 end
 
 -- ────────────────────────── Get IPs ───────────────────────────
@@ -110,22 +110,33 @@ end
 
 -- ──────────────────────────── Discovery ────────────────────────────
 
-function KDEConnectPlugin:_create_discovery_packet()
+function KDEConnectPlugin:_create_discovery_packet(targetDeviceId, targetProtocolVersion)
+    local body = {
+        deviceId = self.device_id,
+        deviceName = "hoseanrc-kindle",
+        deviceType = "desktop",
+        protocolVersion = self.protocol_version,
+        tcpPort = self.tcp_port,
+        incomingCapabilities = {
+            "kdeconnect.notification",
+            "kdeconnect.ping",
+        },
+        outgoingCapabilities = {},
+    }
+
+    if targetDeviceId then
+        self:_print(targetDeviceId)
+        body.targetDeviceId = targetDeviceId
+    end
+    if targetProtocolVersion then
+        self:_print(targetProtocolVersion)
+        body.targetProtocolVersion = tostring(targetProtocolVersion)
+    end
+
     return self:_encode({
         id = 0,
         type = "kdeconnect.identity",
-        body = {
-            deviceId = self.device_id,
-            deviceName = "hoseanrc-kindle",
-            deviceType = "desktop",
-            protocolVersion = self.protocol_version,
-            tcpPort = self.tcp_port,
-            incomingCapabilities = {
-                "kdeconnect.notification",
-                "kdeconnect.ping",
-            },
-            outgoingCapabilities = {},
-        },
+        body = body,
     })
 end
 
@@ -154,6 +165,35 @@ function KDEConnectPlugin:_receive_discovery_responses()
                 and tablelength(packet.body.outgoingCapabilities) > 0
                 and (not contains(getips(), ip)) then
                 -- device has capabilities, respond via TCP
+                self:_print("connecting tcp: [" .. ip .. "]:" .. (packet.body.tcpPort or 1716))
+                local client, err = socket.connect(ip, packet.body.tcpPort or 1716)
+                client:settimeout(0)
+
+                self:_print("tcp error: " .. (err or "none"))
+                -- TODO: add error handing
+                self:_print("ok 1")
+                local ok, senderr = client:send(
+                    self:_create_discovery_packet(packet.body.deviceId, packet.body.protocolVersion) .. "\x0a"
+                )
+                self:_print("tcp send error: " .. (senderr or "none"))
+                -- local a, aerr = client:receive("*l")
+                -- self:_print("tcp got: " .. (a or "nothing") .. ", error: " .. (aerr or "none"))
+
+                local tls, tlserr = self:_wrap_server_tls(client)
+
+                if tlserr then
+                    self:_print("TLS failed: " .. tlserr)
+                elseif tls then
+                    tls:settimeout(1)
+                    local hsok, hserr = tls:dohandshake()
+                    -- local tlsdata, err = tls:receive("*l")
+                    self:_print("tls handshake: " .. (hsok and "OK" or "Fail"))
+                    local a = tls:receive("*l")
+                    self:_print("tls data: " .. (a or "Fail"))
+                    local pkt = self:_create_discovery_packet()
+                    self:_print("sending: " .. pkt)
+                    tls:send(pkt .. "\r\n\x0a")
+                end
             elseif packet.type == "kdeconnect.identity"
                 and packet.body and packet.body.deviceId ~= self.device_id then
                 local dev = packet.body
@@ -222,7 +262,7 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     end
     local client_id = body.deviceId
     local client_proto = body.protocolVersion or 7
-    local tls = self:_wrap_server_tls(client)
+    local tls = self:_wrap_client_tls(client)
     if not tls then
         client:close()
         return
@@ -271,7 +311,7 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     self:_start_polling(client_id)
 end
 
-function KDEConnectPlugin:_wrap_server_tls(client)
+function KDEConnectPlugin:_wrap_client_tls(client)
     local cert_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/cert.pem"
     local key_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/key.pem"
     local tls, err = ssl.wrap(client, {
@@ -281,6 +321,24 @@ function KDEConnectPlugin:_wrap_server_tls(client)
         key = key_path,
         verify = "none",
     })
+    if err then
+        self:_print("TLS wrap error: " .. err)
+    end
+    return tls
+end
+
+function KDEConnectPlugin:_wrap_server_tls(client)
+    local cert_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/cert.pem"
+    local key_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/key.pem"
+    self:_print("wrapping tls")
+    local tls, err = ssl.wrap(client, {
+        mode = "server",
+        protocol = "tlsv1_2",
+        certificate = cert_path,
+        key = key_path,
+        verify = "none",
+    })
+    self:_print("TLS wrap complete")
     if err then
         self:_print("TLS wrap error: " .. err)
     end
@@ -436,11 +494,14 @@ function KDEConnectPlugin:_handle_pair(device_id, body)
     if not conn then return end
     local name = conn.device.deviceName or device_id
     if body.pair then
-        if body.timestamp and math.abs(os.time() - body.timestamp) > 1800 then
-            self:_print("Pairing request from " .. name .. " expired")
-            self:_send_pair_response(device_id, false)
-            return
-        end
+        -- Note: E-readers are not meant to be used for real time chat, so in most cases, the time is inaccurate
+        -- we will need to ignore expiration in this case
+        --if body.timestamp and math.abs(os.time() - body.timestamp) > 1800 then
+        --    self:_print("Pairing request from " ..
+        --    name .. " expired! (current time: " .. os.time() .. ", pair time: " .. body.timestamp .. ")")
+        --    self:_send_pair_response(device_id, false)
+        --    return
+        --end
         self:_print("Pairing request from " .. name .. " — auto-accepting")
         self:_send_pair_response(device_id, true)
         self.paired_devices[device_id] = true
