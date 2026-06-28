@@ -1,7 +1,9 @@
 local json = require("json")
 local socket = require("socket")
 local ssl = require("ssl")
+local _ = require("gettext")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
 
 local function contains(table, val)
@@ -22,12 +24,12 @@ end
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
     is_doc_only = false,
-    device_id = nil,
+    device_id = "ace09003bb5ffa475a290b45eb1ddc81",
     protocol_version = 8,
     tcp_port = 1716,
     udp_socket = socket.udp4(),
     discovered_devices = {},
-    device_name = "KOReader",
+    device_name = "KOReader HoseanRC",
     device_type = "tablet",
     capabilities = {
         "kdeconnect.mock.echo",
@@ -36,6 +38,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
     paired_devices = {},
     tcp_server = nil,
     plugin_dir = nil,
+    pending_connections = {},
 }
 
 function KDEConnectPlugin:_print(a)
@@ -87,15 +90,15 @@ function KDEConnectPlugin:_load_or_create_identity()
     if data then
         local ok, parsed = pcall(json.decode.decode, data)
         if ok and parsed and parsed.device_id then
-            self.device_id = parsed.device_id
+            -- self.device_id = parsed.device_id
             return
         end
     end
     math.randomseed(os.time())
-    self.device_id = ""
-    for _ = 1, 32 do
-        self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
-    end
+    -- self.device_id = ""
+    -- for _ = 1, 32 do
+    --     self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
+    -- end
     self:_write_file(path, json.encode({ device_id = self.device_id }))
 end
 
@@ -113,8 +116,8 @@ end
 function KDEConnectPlugin:_create_discovery_packet(targetDeviceId, targetProtocolVersion)
     local body = {
         deviceId = self.device_id,
-        deviceName = "hoseanrc-kindle",
-        deviceType = "desktop",
+        deviceName = self.device_name,
+        deviceType = self.device_type,
         protocolVersion = self.protocol_version,
         tcpPort = self.tcp_port,
         incomingCapabilities = {
@@ -155,6 +158,140 @@ function KDEConnectPlugin:start_discovery()
     self:_receive_discovery_responses()
 end
 
+function KDEConnectPlugin:_process_pending_connection(conn_id)
+    local pending = self.pending_connections[conn_id]
+    if not pending then return end
+
+    if pending.state == "connect" then
+        local client, err = socket.connect(pending.ip, pending.port)
+        if not client then
+            self:_print("TCP connect failed: " .. (err or "unknown"))
+            self.pending_connections[conn_id] = nil
+            return
+        end
+        client:settimeout(0)
+        pending.client = client
+        pending.state = "send_identity"
+        self:_print("TCP connected, sending identity")
+        UIManager:scheduleIn(0.1, function()
+            self:_process_pending_connection(conn_id)
+        end)
+        return
+    end
+
+    if pending.state == "send_identity" then
+        local ok, err = pending.client:send(
+            self:_create_discovery_packet(pending.target_id, pending.target_version) .. "\n"
+        )
+        if not ok then
+            self:_print("TCP send failed: " .. (err or "unknown"))
+            pending.client:close()
+            self.pending_connections[conn_id] = nil
+            return
+        end
+        pending.state = "wrap_tls"
+        self:_print("Identity sent, wrapping TLS")
+        UIManager:scheduleIn(0.1, function()
+            self:_process_pending_connection(conn_id)
+        end)
+        return
+    end
+
+    if pending.state == "wrap_tls" then
+        local tls, err = self:_wrap_server_tls(pending.client)
+        if not tls then
+            self:_print("TLS wrap failed: " .. (err or "unknown"))
+            pending.client:close()
+            self.pending_connections[conn_id] = nil
+            return
+        end
+        pending.tls = tls
+        pending.state = "handshake"
+        self:_print("TLS wrapped, starting handshake")
+        UIManager:scheduleIn(0.1, function()
+            self:_process_pending_connection(conn_id)
+        end)
+        return
+    end
+
+    if pending.state == "handshake" then
+        pending.tls:settimeout(0)
+        local ok, err = pending.tls:dohandshake()
+        if ok then
+            pending.state = "receive_identity"
+            self:_print("TLS handshake complete, receiving identity")
+            UIManager:scheduleIn(0.1, function()
+                self:_process_pending_connection(conn_id)
+            end)
+            return
+        end
+        if err == "wantread" or err == "wantwrite" then
+            UIManager:scheduleIn(0.1, function()
+                self:_process_pending_connection(conn_id)
+            end)
+            return
+        end
+        self:_print("TLS handshake failed: " .. (err or "unknown"))
+        pending.client:close()
+        self.pending_connections[conn_id] = nil
+        return
+    end
+
+    if pending.state == "receive_identity" then
+        pending.tls:settimeout(0)
+        local line, err = pending.tls:receive("*l")
+        if line then
+            self:_print("Received identity: " .. line)
+            pending.state = "send_full_identity"
+            UIManager:scheduleIn(0.1, function()
+                self:_process_pending_connection(conn_id)
+            end)
+            return
+        end
+        if err == "timeout" or err == "wantread" then
+            UIManager:scheduleIn(0.1, function()
+                self:_process_pending_connection(conn_id)
+            end)
+            return
+        end
+        self:_print("Receive identity failed: " .. (err or "unknown"))
+        pending.client:close()
+        self.pending_connections[conn_id] = nil
+        return
+    end
+
+    if pending.state == "send_full_identity" then
+        local pkt = self:_create_discovery_packet()
+        local ok, err = pending.tls:send(pkt .. "\n")
+        if ok then
+            self:_print("Sent full identity, connection complete")
+            local dev = {
+                ip = pending.ip,
+                deviceId = pending.target_id,
+                deviceName = pending.device_name,
+                deviceType = "unknown",
+                protocolVersion = pending.target_version,
+                tcpPort = pending.port,
+                incomingCapabilities = {},
+                outgoingCapabilities = {},
+            }
+            self.discovered_devices[pending.target_id] = dev
+            self.connections[pending.target_id] = {
+                tcp = pending.client,
+                tls = pending.tls,
+                device = dev,
+            }
+            self.pending_connections[conn_id] = nil
+            self:_start_polling(pending.target_id)
+            return
+        end
+        self:_print("Send full identity failed: " .. (err or "unknown"))
+        pending.client:close()
+        self.pending_connections[conn_id] = nil
+        return
+    end
+end
+
 function KDEConnectPlugin:_receive_discovery_responses()
     local data, ip = self.udp_socket:receivefrom()
     while data do
@@ -164,36 +301,18 @@ function KDEConnectPlugin:_receive_discovery_responses()
             if type(packet.body.outgoingCapabilities) == "table"
                 and tablelength(packet.body.outgoingCapabilities) > 0
                 and (not contains(getips(), ip)) then
-                -- device has capabilities, respond via TCP
-                self:_print("connecting tcp: [" .. ip .. "]:" .. (packet.body.tcpPort or 1716))
-                local client, err = socket.connect(ip, packet.body.tcpPort or 1716)
-                client:settimeout(0)
-
-                self:_print("tcp error: " .. (err or "none"))
-                -- TODO: add error handing
-                self:_print("ok 1")
-                local ok, senderr = client:send(
-                    self:_create_discovery_packet(packet.body.deviceId, packet.body.protocolVersion) .. "\x0a"
-                )
-                self:_print("tcp send error: " .. (senderr or "none"))
-                -- local a, aerr = client:receive("*l")
-                -- self:_print("tcp got: " .. (a or "nothing") .. ", error: " .. (aerr or "none"))
-
-                local tls, tlserr = self:_wrap_server_tls(client)
-
-                if tlserr then
-                    self:_print("TLS failed: " .. tlserr)
-                elseif tls then
-                    tls:settimeout(1)
-                    local hsok, hserr = tls:dohandshake()
-                    -- local tlsdata, err = tls:receive("*l")
-                    self:_print("tls handshake: " .. (hsok and "OK" or "Fail"))
-                    local a = tls:receive("*l")
-                    self:_print("tls data: " .. (a or "Fail"))
-                    local pkt = self:_create_discovery_packet()
-                    self:_print("sending: " .. pkt)
-                    tls:send(pkt .. "\r\n\x0a")
-                end
+                -- device has capabilities, initiate non-blocking TCP connection
+                local conn_id = packet.body.deviceId
+                self:_print("initiating tcp: [" .. ip .. "]:" .. (packet.body.tcpPort or 1716))
+                self.pending_connections[conn_id] = {
+                    state = "connect",
+                    ip = ip,
+                    port = packet.body.tcpPort or 1716,
+                    target_id = packet.body.deviceId,
+                    target_version = packet.body.protocolVersion,
+                    device_name = packet.body.deviceName or conn_id,
+                }
+                self:_process_pending_connection(conn_id)
             elseif packet.type == "kdeconnect.identity"
                 and packet.body and packet.body.deviceId ~= self.device_id then
                 local dev = packet.body
@@ -375,49 +494,6 @@ function KDEConnectPlugin:_create_initial_identity(target_id, target_version)
     })
 end
 
-function KDEConnectPlugin:connect_to_device(device_id)
-    local device = self.discovered_devices[device_id]
-    if not device then
-        self:_print("Device not found")
-        return
-    end
-    local tcp = socket.tcp()
-    tcp:settimeout(5)
-    local ok, err = tcp:connect(device.ip, device.tcpPort or 1716)
-    if not ok then
-        self:_print("TCP connect failed: " .. err)
-        return
-    end
-    local init = self:_create_initial_identity(device.deviceId, device.protocolVersion)
-    tcp:send(init .. "\n")
-    local tls = ssl.wrap(tcp, {
-        mode = "client",
-        protocol = "tlsv1_2",
-        verify = "none",
-    })
-    if not tls then
-        tcp:close()
-        self:_print("TLS wrap failed")
-        return
-    end
-    tls:settimeout(5)
-    ok = tls:dohandshake()
-    if not ok then
-        tcp:close()
-        self:_print("TLS handshake failed")
-        return
-    end
-    local full = self:_create_full_identity()
-    tls:send(full .. "\n")
-    self.connections[device_id] = {
-        tcp = tcp,
-        tls = tls,
-        device = device,
-    }
-    self:_print("Connected to " .. (device.deviceName or device.deviceId))
-    self:_start_polling(device_id)
-end
-
 -- ──────────────────────────── Packet Send/Recv ─────────────────────
 
 function KDEConnectPlugin:_send_json(conn, packet)
@@ -448,7 +524,7 @@ end
 function KDEConnectPlugin:_poll_connection(device_id)
     local conn = self.connections[device_id]
     if not conn then return end
-    conn.tls:settimeout(1)
+    conn.tls:settimeout(0)
     local line, err = conn.tls:receive("*l")
     while line do
         self:_print("RX: " .. line)
@@ -502,15 +578,24 @@ function KDEConnectPlugin:_handle_pair(device_id, body)
         --    self:_send_pair_response(device_id, false)
         --    return
         --end
-        self:_print("Pairing request from " .. name .. " — auto-accepting")
-        self:_send_pair_response(device_id, true)
-        self.paired_devices[device_id] = true
+
+        UIManager:show(ConfirmBox:new {
+            text = _("Device \"" .. name .. "\" sent a pair request.\nDo you want to pair?"),
+            ok_text = _("Pair"),
+            ok_callback = function()
+                self:_send_pair_response(device_id, true)
+            end,
+            cancel_callback = function ()
+                self:_send_pair_response(device_id, false)
+            end
+        })
     else
         self:_print("Pairing rejected/unpaired by " .. name)
     end
 end
 
 function KDEConnectPlugin:_send_pair_response(device_id, accepted)
+    self.paired_devices[device_id] = accepted
     local conn = self.connections[device_id]
     if not conn then return end
     self:_send_json(conn, {
@@ -530,6 +615,8 @@ end
 
 
 function KDEConnectPlugin:init()
+    -- local ok, err = os.execute("openssl -v")
+    -- self:_print("OK: " .. tostring(ok) .. ", err: " .. tostring(err))
     self:_load_or_create_identity()
     self:start_discovery()
     self:start_tcp_server()
