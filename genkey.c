@@ -1,29 +1,3 @@
-/* ecc_keys.c
- *
- * Copyright (C) 2006-2020 wolfSSL Inc.
- *
- * This file is part of wolfSSL. (formerly known as CyaSSL)
- *
- * wolfSSL is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * wolfSSL is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
- */
-
-/*
-./configure && make && sudo make install
-gcc -lwolfssl -o ecc_pub ecc_pub.c
-*/
-
 #include "user_settings.h"
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/ecc.h>
@@ -38,24 +12,41 @@ gcc -lwolfssl -o ecc_pub ecc_pub.c
 
 #define MAX_DER_SZ 256
 
-int main()
+int write_file(const char *filename, byte *data, size_t sz)
+{
+    FILE *derFile;
+
+    derFile = fopen(filename, "w");
+    if (!derFile)
+    {
+        printf("error opening file\n");
+        return -1;
+    }
+
+    fwrite(data, 1, sz, derFile);
+    fclose(derFile);
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
 {
     int ret;
     ecc_key key;
     WC_RNG rng;
-    byte der[MAX_DER_SZ*4];
-    byte buf[MAX_DER_SZ*2];
-    word32 idx;
-    FILE *derFile;
-    size_t sz;
-
     Cert cert;
-    wc_InitCert(&cert);
-
-    strncpy(cert.subject.commonName, "hello world", CTC_NAME_SIZE);
-
+    byte buf[MAX_DER_SZ * 2];
+    byte pem[MAX_DER_SZ * 4];
+    
     wc_InitRng(&rng);
     wc_ecc_init(&key);
+    wc_InitCert(&cert);
+
+    if (argc > 1)
+    {
+        strncpy(cert.subject.commonName, argv[1], CTC_NAME_SIZE);
+    }
+    cert.daysValid = 365 * 9;
 
     ret = wc_ecc_make_key_ex(&rng, ECC_CURVE_SZ, &key, ECC_CURVE_ID);
     if (ret != 0)
@@ -64,30 +55,29 @@ int main()
         return ret;
     }
 
-    /* write private key */
-    ret = wc_EccKeyToDer(&key, der, sizeof(der));
+    ret = wc_EccKeyToDer(&key, buf, sizeof(buf));
     if (ret < 0)
     {
         printf("error %d in ecc to der\n", ret);
         return ret;
     }
-    sz = ret;
 
-    printf("writing private key to ecc-key.der (%d bytes)\n", (int)sz);
-
-    byte pem[4096];
-
-    int pemSz = wc_DerToPem(
-        der, sz,
+    ret = wc_DerToPem(
+        buf, ret,
         pem, sizeof(pem),
         ECC_PRIVATEKEY_TYPE);
-    if (pemSz < 0)
+    if (ret < 0)
     {
-        // error
+        printf("error converting key: -%d\n", -ret);
+        return -1;
     }
 
-    // pem now contains a null-terminated PEM string.
-    printf("%s\n", pem);
+    ret = write_file("key.pem", pem, ret);
+    if (ret < 0)
+    {
+        printf("error in writing key.pem: -%d\n", -ret);
+        return -1;
+    }
 
     ret = wc_MakeCert(&cert, buf, sizeof(buf), NULL, &key, &rng);
     if (ret < 0)
@@ -105,7 +95,7 @@ int main()
         return -1;
     }
 
-    ret = wc_DerToPem(buf, ret, der, sizeof(der), CERT_TYPE);
+    ret = wc_DerToPem(buf, ret, pem, sizeof(pem), CERT_TYPE);
 
     if (ret < 0)
     {
@@ -113,7 +103,12 @@ int main()
         return -1;
     }
 
-    printf("\n%s\n", der);
+    ret = write_file("cert.pem", pem, ret);
+    if (ret < 0)
+    {
+        printf("error in writing key.pem: -%d\n", -ret);
+        return -1;
+    }
 
     wc_ecc_free(&key);
 
