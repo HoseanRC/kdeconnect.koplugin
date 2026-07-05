@@ -134,7 +134,8 @@ extern "C"
 #undef HAVE_POLY1305
 #define HAVE_POLY1305
 #undef HAVE_PTHREAD
-#define HAVE_PTHREAD 1
+// #define HAVE_PTHREAD 1
+#define SINGLE_THREADED
 #undef HAVE_REPRODUCIBLE_BUILD
 #define HAVE_REPRODUCIBLE_BUILD
 #undef HAVE_SESSION_TICKET
@@ -341,14 +342,14 @@ extern "C"
 #define WOLFSSL_SHA3
 #undef WOLFSSL_SHA3_SMALL
 /* #undef WOLFSSL_SHA3_SMALL */
-#undef WOLFSSL_SHA384
-#define WOLFSSL_SHA384
-#undef WOLFSSL_SHA512
+// #undef WOLFSSL_SHA384
+// #define WOLFSSL_SHA384
+// #undef WOLFSSL_SHA512
 #define WOLFSSL_SHA512
-#undef WOLFSSL_SHAKE128
+// #undef WOLFSSL_SHAKE128
 #define WOLFSSL_SHAKE128
-#undef WOLFSSL_SHAKE256
-#define WOLFSSL_SHAKE256
+// #undef WOLFSSL_SHAKE256
+// #define WOLFSSL_SHAKE256
 #undef WOLFSSL_SRTP
 /* #undef WOLFSSL_SRTP */
 #undef WOLFSSL_SYS_CA_CERTS
@@ -426,6 +427,22 @@ extern "C"
 // #define WOLFSSL_PEM_TO_DER
 
 #define SP_WORD_SIZE 32
+#define NO_INT128
+#define WOLFSSL_USER_SETTINGS
+#define NO_ASN_TIME
+#define NO_PWDBASED
+#define NO_RSA
+#define NO_DH
+#define NO_DES3
+#define NO_MD5
+#define NO_SHA
+#define NO_SHA512
+#define NO_ECC_SECPR1
+#define NO_ECC_SECPR2
+#define NO_ECC_SECPR3
+#define NO_ECC_BRAINPOOL
+#define NO_ECC_CURVE25519
+#define NO_ECC_CURVE448
 
 #ifdef __cplusplus
 }

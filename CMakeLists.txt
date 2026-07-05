@@ -3,6 +3,12 @@ project(WolfSSLApp C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Optimize for size
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -flto=auto -Os")
+    # set(CMAKE_EXE_LINKER_FLAGS "-flto -s")
+endif()
+
 # 1. WolfSSL Library Build Project
 # Find all source files
 file(GLOB WOLFSSL_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "wolfssl/src/*.c")
@@ -33,6 +39,8 @@ message(${EXCLUDE_FILES})
 # Remove excluded files from the list
 list(REMOVE_ITEM WOLFSSL_SRC ${EXCLUDE_FILES})
 list(REMOVE_ITEM WOLFCRYPT_SRC ${EXCLUDE_FILES})
+
+set(CMAKE_EXE_LINKER_FLAGS "-static")
 
 # Create the library target
 add_library(wolfssl_lib STATIC ${WOLFSSL_SRC} ${WOLFCRYPT_SRC})
