@@ -24,7 +24,7 @@ end
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
     is_doc_only = false,
-    device_id = "ace09003bb5ffa475a290b45eb1ddc81",
+    device_id = "",
     protocol_version = 8,
     tcp_port = 1716,
     udp_socket = socket.udp4(),
@@ -62,7 +62,7 @@ end
 function KDEConnectPlugin:_get_plugin_dir()
     if not self.plugin_dir then
         local info = debug.getinfo(2, "S")
-        self.plugin_dir = info.source:match("^(.*/)")
+        self.plugin_dir = info.source:match("^@?(.*/)")
     end
     return self.plugin_dir
 end
@@ -90,15 +90,15 @@ function KDEConnectPlugin:_load_or_create_identity()
     if data then
         local ok, parsed = pcall(json.decode.decode, data)
         if ok and parsed and parsed.device_id then
-            -- self.device_id = parsed.device_id
+            self.device_id = parsed.device_id
             return
         end
     end
     math.randomseed(os.time())
-    -- self.device_id = ""
-    -- for _ = 1, 32 do
-    --     self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
-    -- end
+    self.device_id = ""
+    for _ = 1, 32 do
+        self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
+    end
     self:_write_file(path, json.encode({ device_id = self.device_id }))
 end
 

@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     Cert cert;
     byte buf[MAX_DER_SZ * 2];
     byte pem[MAX_DER_SZ * 4];
-    
+
     wc_InitRng(&rng);
     wc_ecc_init(&key);
     wc_InitCert(&cert);
