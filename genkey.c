@@ -110,8 +110,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    wc_ecc_free(&key);
-
+    wc_ForceZero(&cert, sizeof(Cert));
     wc_ecc_free(&key);
     wc_FreeRng(&rng);
     return 0;
