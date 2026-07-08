@@ -421,17 +421,16 @@ extern "C"
 #undef WOLFSSL_EXTRA_PQC_HYBRIDS
   /* #undef WOLFSSL_EXTRA_PQC_HYBRIDS */
 
-// #define NO_WOLFSSL_MEMORY
-// #define WOLFSSL_NO_PEM
-// #define NO_PSK
-// #define WOLFSSL_PEM_TO_DER
+  // #define NO_WOLFSSL_MEMORY
+  // #define WOLFSSL_NO_PEM
+  // #define NO_PSK
+  // #define WOLFSSL_PEM_TO_DER
 
 #define SP_WORD_SIZE 32
 #define NO_INT128
 #define WOLFSSL_USER_SETTINGS
-#define NO_ASN_TIME
-#define NO_PWDBASED
-#define NO_RSA
+// #define NO_PWDBASED
+// #define NO_RSA
 #define NO_DH
 #define NO_DES3
 #define NO_MD5
