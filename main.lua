@@ -5,21 +5,8 @@ local _ = require("gettext")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
-
-local function contains(table, val)
-    for i = 1, #table do
-        if table[i] == val then
-            return true
-        end
-    end
-    return false
-end
-
-local function tablelength(T)
-    local count = 0
-    for _ in pairs(T) do count = count + 1 end
-    return count
-end
+local File = require("./file")
+local Table = require("./table")
 
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
@@ -59,34 +46,26 @@ local function getips()
     return ips
 end
 
-function KDEConnectPlugin:_get_plugin_dir()
-    if not self.plugin_dir then
-        local info = debug.getinfo(2, "S")
-        self.plugin_dir = info.source:match("^@?(.*/)")
+local current_dir = nil
+
+---
+---returns current dir path
+---
+---@return string
+---@nodiscard
+local function plugin_dir()
+    if current_dir then
+        return current_dir
     end
-    return self.plugin_dir
+    local info = debug.getinfo(2, "S")
+    current_dir = info.source:match("^@?(.*/)")
+    return current_dir
 end
 
-function KDEConnectPlugin:_read_file(path)
-    local f = io.open(path, "r")
-    if not f then return end
-    local content = f:read("*a")
-    f:close()
-    return content
-end
-
-function KDEConnectPlugin:_write_file(path, content)
-    local f = io.open(path, "w")
-    if not f then return false end
-    f:write(content)
-    f:close()
-    return true
-end
-
-function KDEConnectPlugin:_load_or_create_identity()
-    local dir = self:_get_plugin_dir()
-    local path = dir .. "identity.json"
-    local data = self:_read_file(path)
+function KDEConnectPlugin:_load_config()
+    local path = plugin_dir() .. "config.json"
+    self:_print(tostring(debug.getinfo(2, "S").source:match("^@?(.*/)")))
+    local data = File.read(path)
     if data then
         local ok, parsed = pcall(json.decode.decode, data)
         if ok and parsed and parsed.device_id then
@@ -99,7 +78,15 @@ function KDEConnectPlugin:_load_or_create_identity()
     for _ = 1, 32 do
         self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
     end
-    self:_write_file(path, json.encode({ device_id = self.device_id }))
+    if not (File.exists(plugin_dir() .. "cert.pem") and File.exists(plugin_dir() .. "key.pem")) then
+        local status = os.execute(plugin_dir() .. 'genkey "' .. self.device_id .. '"')
+        if status ~= 0 or status == false then
+            self:_print("error in executing genkey")
+            -- handle error and show solutions
+            return
+        end
+    end
+    File.write(path, json.encode({ device_id = self.device_id }))
 end
 
 function KDEConnectPlugin:_encode(packet)
@@ -299,8 +286,8 @@ function KDEConnectPlugin:_receive_discovery_responses()
         local packet = self:_decode(data)
         if packet and packet.body then
             if type(packet.body.outgoingCapabilities) == "table"
-                and tablelength(packet.body.outgoingCapabilities) > 0
-                and (not contains(getips(), ip)) then
+                and Table.length(packet.body.outgoingCapabilities) > 0
+                and (not Table.contains(getips(), ip)) then
                 -- device has capabilities, initiate non-blocking TCP connection
                 local conn_id = packet.body.deviceId
                 self:_print("initiating tcp: [" .. ip .. "]:" .. (packet.body.tcpPort or 1716))
@@ -431,8 +418,8 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
 end
 
 function KDEConnectPlugin:_wrap_client_tls(client)
-    local cert_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/cert.pem"
-    local key_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/key.pem"
+    local cert_path = plugin_dir() .. "cert.pem"
+    local key_path = plugin_dir() .. "key.pem"
     local tls, err = ssl.wrap(client, {
         mode = "client",
         protocol = "tlsv1_2",
@@ -447,8 +434,8 @@ function KDEConnectPlugin:_wrap_client_tls(client)
 end
 
 function KDEConnectPlugin:_wrap_server_tls(client)
-    local cert_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/cert.pem"
-    local key_path = "/sdcard/koreader/plugins/kdeconnect.koplugin/key.pem"
+    local cert_path = plugin_dir() .. "cert.pem"
+    local key_path = plugin_dir() .. "key.pem"
     self:_print("wrapping tls")
     local tls, err = ssl.wrap(client, {
         mode = "server",
@@ -585,7 +572,7 @@ function KDEConnectPlugin:_handle_pair(device_id, body)
             ok_callback = function()
                 self:_send_pair_response(device_id, true)
             end,
-            cancel_callback = function ()
+            cancel_callback = function()
                 self:_send_pair_response(device_id, false)
             end
         })
@@ -615,9 +602,7 @@ end
 
 
 function KDEConnectPlugin:init()
-    -- local ok, err = os.execute("openssl -v")
-    -- self:_print("OK: " .. tostring(ok) .. ", err: " .. tostring(err))
-    self:_load_or_create_identity()
+    self:_load_config()
     self:start_discovery()
     self:start_tcp_server()
 end
