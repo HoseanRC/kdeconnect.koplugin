@@ -7,20 +7,36 @@ local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
 local File = require("./file")
 local Table = require("./table")
+local PluginManager = require("./plugins/__init__").PluginManager
+local Device = require("./device")
 
+--- @class KDEConnectPlugin
+--- @field name string
+--- @field is_doc_only boolean
+--- @field protocol_version number
+--- @field tcp_port number
+--- @field udp_socket unknown
+--- @field discovered_devices Device[]
+--- @field device_name string
+--- @field device_type string
+--- @field capabilities table
+--- @field plugin_manager PluginManager
+--- @field connections table
+--- @field paired_devices Device[]
+--- @field tcp_server unknown
+--- @field plugin_dir string
+--- @field pending_connections table
 local KDEConnectPlugin = WidgetContainer:extend {
     name = "kdeconnect",
     is_doc_only = false,
-    device_id = "",
     protocol_version = 8,
     tcp_port = 1716,
     udp_socket = socket.udp4(),
     discovered_devices = {},
     device_name = "KOReader HoseanRC",
     device_type = "tablet",
-    capabilities = {
-        "kdeconnect.mock.echo",
-    },
+    capabilities = {},
+    plugin_manager = nil,
     connections = {},
     paired_devices = {},
     tcp_server = nil,
@@ -29,7 +45,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
 }
 
 function KDEConnectPlugin:_print(a)
-    self.udp_socket:sendto(a .. "\n", "192.168.1.60", 11111)
+    self.udp_socket:sendto(a .. "\n", "10.208.233.146", 11111)
 end
 
 -- ────────────────────────── Get IPs ───────────────────────────
@@ -68,7 +84,9 @@ function KDEConnectPlugin:_load_config()
     local data = File.read(path)
     if data then
         local ok, parsed = pcall(json.decode.decode, data)
+        self:_print("parsing: " .. tostring(ok) .. " " .. tostring(parsed))
         if ok and parsed and parsed.device_id then
+            self:_print("ID: " .. parsed.device_id)
             self.device_id = parsed.device_id
             return
         end
@@ -89,6 +107,12 @@ function KDEConnectPlugin:_load_config()
     File.write(path, json.encode({ device_id = self.device_id }))
 end
 
+function KDEConnectPlugin:_init_plugins()
+    self.plugin_manager = PluginManager:new()
+    self.plugin_manager:load_from_directory(plugin_dir() .. "plugins/")
+    self:_print("Loaded " .. #self.plugin_manager.plugins .. " plugins")
+end
+
 function KDEConnectPlugin:_encode(packet)
     return json.encode(packet)
 end
@@ -107,10 +131,7 @@ function KDEConnectPlugin:_create_discovery_packet(targetDeviceId, targetProtoco
         deviceType = self.device_type,
         protocolVersion = self.protocol_version,
         tcpPort = self.tcp_port,
-        incomingCapabilities = {
-            "kdeconnect.notification",
-            "kdeconnect.ping",
-        },
+        incomingCapabilities = self.capabilities,
         outgoingCapabilities = {},
     }
 
@@ -249,19 +270,20 @@ function KDEConnectPlugin:_process_pending_connection(conn_id)
 
     if pending.state == "send_full_identity" then
         local pkt = self:_create_discovery_packet()
+        self:_print("sending: " .. pkt)
         local ok, err = pending.tls:send(pkt .. "\n")
         if ok then
             self:_print("Sent full identity, connection complete")
-            local dev = {
-                ip = pending.ip,
-                deviceId = pending.target_id,
-                deviceName = pending.device_name,
-                deviceType = "unknown",
-                protocolVersion = pending.target_version,
-                tcpPort = pending.port,
-                incomingCapabilities = {},
-                outgoingCapabilities = {},
-            }
+            local dev = Device:new(
+                pending.ip,
+                pending.target_id,
+                pending.device_name,
+                "unknown",
+                pending.target_version,
+                pending.port,
+                {},
+                {}
+            )
             self.discovered_devices[pending.target_id] = dev
             self.connections[pending.target_id] = {
                 tcp = pending.client,
@@ -532,8 +554,6 @@ function KDEConnectPlugin:_dispatch_packet(device_id, packet)
     local t = packet.type
     if t == "kdeconnect.pair" then
         self:_handle_pair(device_id, packet.body)
-    elseif t == "kdeconnect.mock.echo" then
-        self:_handle_echo(packet.body)
     elseif t == "kdeconnect.identity" then
         local body = packet.body
         if body.deviceId then
@@ -545,8 +565,16 @@ function KDEConnectPlugin:_dispatch_packet(device_id, packet)
                 dev.outgoingCapabilities = body.outgoingCapabilities or dev.outgoingCapabilities
             end
         end
+        -- Let plugin manager handle plugin-specific packets
     else
-        self:_print("Unknown packet type: " .. t)
+        if self.plugin_manager then
+            socket.udp4():sendto("#1\n", "10.208.233.146", 11111)
+            local handled = self.plugin_manager:handle_packet(packet, self.discovered_devices[device_id])
+            if handled then
+                return
+            end
+        end
+        -- self:_print("Unknown packet type: " .. t)
     end
 end
 
@@ -592,12 +620,6 @@ function KDEConnectPlugin:_send_pair_response(device_id, accepted)
     })
 end
 
--- ──────────────────────────── Echo ────────────────────────────
-
-function KDEConnectPlugin:_handle_echo(body)
-    self:_print("Echo: " .. json.encode(body))
-end
-
 -- ──────────────────────────── Init ────────────────────────────
 
 local initialised = false
@@ -605,8 +627,9 @@ local initialised = false
 function KDEConnectPlugin:init()
     if initialised then return end
     initialised = true
-    
+
     self:_load_config()
+    self:_init_plugins()
     self:start_discovery()
     self:start_tcp_server()
 end
