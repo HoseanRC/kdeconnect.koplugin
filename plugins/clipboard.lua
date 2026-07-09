@@ -9,11 +9,23 @@ local plugin_id = "kdeconnect.clipboard"
 
 local lastClipboardContent = nil
 
-UIManager:scheduleIn(1, function()
+---@type string|nil
+local lastview = nil
+
+local checkCopy
+checkCopy = function()
+  local view = UIManager:getNthTopWidget(1)
+  if (view and view.name or nil) ~= lastview then
+    -- delay on view change
+    lastview = (view and view.name or nil)
+    UIManager:scheduleIn(5, checkCopy)
+    return
+  end
   local content = Device.input.getClipboardText()
-  if content ~= lastClipboardContent then
+  if content ~= lastClipboardContent and content ~= "" then
     if lastClipboardContent ~= nil then
-      for _, device in pairs(PluginManager:get_connected_devices()) do
+      local devices = PluginManager:get_connected_devices()
+      for _, device in pairs(devices) do
         device:send("", {
           content = content
         }, plugin_id)
@@ -21,7 +33,9 @@ UIManager:scheduleIn(1, function()
     end
     lastClipboardContent = content
   end
-end)
+  UIManager:scheduleIn(1, checkCopy)
+end
+checkCopy()
 
 ---@param plugin Plugin Plugin instance
 ---@param packet table Incoming packet

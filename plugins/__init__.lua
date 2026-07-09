@@ -51,7 +51,7 @@ PluginManager.__index = PluginManager
 --- Create a new plugin manager
 ---@return PluginManager
 function PluginManager:new()
-    local self = setmetatable({}, PluginManager)
+    -- local self = setmetatable({}, PluginManager)
     self.plugins = {}
     self.devices = {}
     return self
