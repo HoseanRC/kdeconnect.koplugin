@@ -79,7 +79,7 @@ function KDEConnectPlugin:_load_config()
         self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
     end
     if not (File.exists(plugin_dir() .. "cert.pem") and File.exists(plugin_dir() .. "key.pem")) then
-        local status = os.execute(plugin_dir() .. 'genkey "' .. self.device_id .. '"')
+        local status = os.execute("cd " .. plugin_dir() .. '; ./genkey "' .. self.device_id .. '"')
         if status ~= 0 or status == false then
             self:_print("error in executing genkey")
             -- handle error and show solutions
