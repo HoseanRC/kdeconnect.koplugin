@@ -19,7 +19,8 @@ local Device = require("./utils/device")
 --- @field discovered_devices Device[]
 --- @field device_name string
 --- @field device_type string
---- @field capabilities table
+--- @field incomingCapabilities string[]
+--- @field outgoingCapabilities string[]
 --- @field plugin_manager PluginManager
 --- @field connections table
 --- @field paired_devices Device[]
@@ -35,7 +36,8 @@ local KDEConnectPlugin = WidgetContainer:extend {
     discovered_devices = {},
     device_name = "KOReader HoseanRC",
     device_type = "tablet",
-    capabilities = {},
+    incomingCapabilities = {},
+    outgoingCapabilities = {},
     plugin_manager = nil,
     connections = {},
     paired_devices = {},
@@ -113,6 +115,25 @@ function KDEConnectPlugin:_init_plugins()
     self:_print("Loaded " .. #self.plugin_manager.plugins .. " plugins")
 end
 
+function KDEConnectPlugin:_build_capabilities_from_plugins()
+    self.incomingCapabilities = {}
+    self.outgoingCapabilities = {}
+
+    if not self.plugin_manager then return end
+
+    for _, plugin in ipairs(self.plugin_manager.plugins) do
+        if plugin.direction == "incoming" or plugin.direction == "both" then
+            table.insert(self.incomingCapabilities, plugin.id)
+        end
+        if plugin.direction == "outgoing" or plugin.direction == "both" then
+            table.insert(self.outgoingCapabilities, plugin.id)
+        end
+    end
+
+    self:_print("Incoming capabilities: " .. table.concat(self.incomingCapabilities, ", "))
+    self:_print("Outgoing capabilities: " .. table.concat(self.outgoingCapabilities, ", "))
+end
+
 function KDEConnectPlugin:_encode(packet)
     return json.encode(packet)
 end
@@ -131,8 +152,8 @@ function KDEConnectPlugin:_create_discovery_packet(targetDeviceId, targetProtoco
         deviceType = self.device_type,
         protocolVersion = self.protocol_version,
         tcpPort = self.tcp_port,
-        incomingCapabilities = self.capabilities,
-        outgoingCapabilities = {},
+        incomingCapabilities = self.incomingCapabilities,
+        outgoingCapabilities = self.outgoingCapabilities,
     }
 
     if targetDeviceId then
@@ -496,8 +517,8 @@ function KDEConnectPlugin:_create_full_identity()
             protocolVersion = self.protocol_version,
             deviceName = self.device_name,
             deviceType = self.device_type,
-            incomingCapabilities = self.capabilities,
-            outgoingCapabilities = self.capabilities,
+            incomingCapabilities = self.incomingCapabilities,
+            outgoingCapabilities = self.outgoingCapabilities,
         },
     })
 end
@@ -655,6 +676,7 @@ function KDEConnectPlugin:init()
 
     self:_load_config()
     self:_init_plugins()
+    self:_build_capabilities_from_plugins()
     self:start_discovery()
     self:start_tcp_server()
 end
