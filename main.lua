@@ -5,10 +5,10 @@ local _ = require("gettext")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local ConfirmBox = require("ui/widget/confirmbox")
 local UIManager = require("ui/uimanager")
-local File = require("./file")
+local File = require("./utils/file")
 local Table = require("./table")
 local PluginManager = require("./plugins/__init__").PluginManager
-local Device = require("./device")
+local Device = require("./utils/device")
 
 --- @class KDEConnectPlugin
 --- @field name string
