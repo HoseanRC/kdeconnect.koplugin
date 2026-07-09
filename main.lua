@@ -289,7 +289,14 @@ function KDEConnectPlugin:_process_pending_connection(conn_id)
                 tcp = pending.client,
                 tls = pending.tls,
                 device = dev,
+                encode_func = function(packet) return self:_encode(packet) end,
             }
+            -- Store connection on device for plugin communication
+            dev.connection = self.connections[pending.target_id]
+            -- Register device in plugin manager
+            if self.plugin_manager then
+                self.plugin_manager:register_device(dev)
+            end
             self.pending_connections[conn_id] = nil
             self:_start_polling(pending.target_id)
             return
@@ -419,22 +426,29 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     local packet_str = self:_create_discovery_packet()
     tls:send(packet_str)
     local remote = remote_pkt.body
-    local dev = {
-        ip = client:getpeername(),
-        deviceId = client_id,
-        deviceName = remote.deviceName or body.deviceName or client_id,
-        deviceType = remote.deviceType,
-        protocolVersion = client_proto,
-        tcpPort = body.tcpPort or 1716,
-        incomingCapabilities = remote.incomingCapabilities or {},
-        outgoingCapabilities = remote.outgoingCapabilities or {},
-    }
+    local dev = Device:new(
+        client:getpeername(),
+        client_id,
+        remote.deviceName or body.deviceName or client_id,
+        remote.deviceType,
+        client_proto,
+        body.tcpPort or 1716,
+        remote.incomingCapabilities or {},
+        remote.outgoingCapabilities or {}
+    )
     self.discovered_devices[client_id] = dev
     self.connections[client_id] = {
         tcp = client,
         tls = tls,
         device = dev,
+        encode_func = function(packet) return self:_encode(packet) end,
     }
+    -- Store connection on device for plugin communication
+    dev.connection = self.connections[client_id]
+    -- Register device in plugin manager
+    if self.plugin_manager then
+        self.plugin_manager:register_device(dev)
+    end
     self:_print("Connected: " .. (dev.deviceName or client_id))
     self:_start_polling(client_id)
 end
@@ -516,6 +530,16 @@ end
 function KDEConnectPlugin:_disconnect(device_id, reason)
     local conn = self.connections[device_id]
     if not conn then return end
+
+    -- Remove connection from device
+    if conn.device then
+        conn.device.connection = nil
+        -- Unregister device from plugin manager
+        if self.plugin_manager then
+            self.plugin_manager:unregister_device(device_id)
+        end
+    end
+
     pcall(conn.tls.close, conn.tls)
     pcall(conn.tcp.close, conn.tcp)
     self.connections[device_id] = nil
@@ -569,7 +593,8 @@ function KDEConnectPlugin:_dispatch_packet(device_id, packet)
     else
         if self.plugin_manager then
             socket.udp4():sendto("#1\n", "10.208.233.146", 11111)
-            local handled = self.plugin_manager:handle_packet(packet, self.discovered_devices[device_id])
+            local conn = self.connections[device_id]
+            local handled = self.plugin_manager:handle_packet(packet, self.discovered_devices[device_id], conn)
             if handled then
                 return
             end

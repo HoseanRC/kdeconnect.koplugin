@@ -44,6 +44,7 @@ end
 --- Base plugin manager
 ---@class PluginManager
 ---@field plugins table List of loaded plugins
+---@field devices table Map of device_id -> Device
 local PluginManager = {}
 PluginManager.__index = PluginManager
 
@@ -52,6 +53,7 @@ PluginManager.__index = PluginManager
 function PluginManager:new()
     local self = setmetatable({}, PluginManager)
     self.plugins = {}
+    self.devices = {}
     return self
 end
 
@@ -79,14 +81,38 @@ function PluginManager:load_from_directory(plugin_dir)
     end
 end
 
+--- Register a device with the plugin manager
+---@param device Device Device to register
+function PluginManager:register_device(device)
+    self.devices[device.deviceId] = device
+end
+
+--- Unregister a device from the plugin manager
+---@param device_id string Device ID to unregister
+function PluginManager:unregister_device(device_id)
+    self.devices[device_id] = nil
+end
+
+--- Get a device by ID
+---@param device_id string Device ID
+---@return Device or nil
+function PluginManager:get_device(device_id)
+    return self.devices[device_id]
+end
+
 --- Handle packet
 ---@param packet table Packet to handle
 ---@param device Device
-function PluginManager:handle_packet(packet, device)
+---@param connection table Connection object (for plugin responses)
+function PluginManager:handle_packet(packet, device, connection)
     ---@param plugin Plugin
     for _, plugin in ipairs(self.plugins) do
         if plugin:can_handle(packet) then
+            -- Set plugin_id on device for namespace resolution in device:send()
+            device.plugin_id = plugin.id
             plugin:handle(packet, device)
+            -- Clear plugin_id after handling
+            device.plugin_id = nil
             return true
         end
     end
