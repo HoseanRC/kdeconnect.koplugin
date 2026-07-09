@@ -44,7 +44,7 @@ end
 --- Base plugin manager
 ---@class PluginManager
 ---@field plugins table List of loaded plugins
----@field devices table Map of device_id -> Device
+---@field devices Device[] Map of device_id -> Device
 local PluginManager = {}
 PluginManager.__index = PluginManager
 
@@ -98,6 +98,19 @@ end
 ---@return Device or nil
 function PluginManager:get_device(device_id)
     return self.devices[device_id]
+end
+
+--- Get connected devices
+---@return Device[]
+function PluginManager:get_connected_devices()
+    ---@type Device[]
+    local connectedDevices = {}
+    for _, device in pairs(self.devices) do
+        if device.connection then
+            table.insert(connectedDevices, device)
+        end
+    end
+    return connectedDevices
 end
 
 --- Handle packet
