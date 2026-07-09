@@ -600,8 +600,12 @@ end
 
 -- ──────────────────────────── Init ────────────────────────────
 
+local initialised = false
 
 function KDEConnectPlugin:init()
+    if initialised then return end
+    initialised = true
+    
     self:_load_config()
     self:start_discovery()
     self:start_tcp_server()
