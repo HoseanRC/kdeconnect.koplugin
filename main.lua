@@ -3,7 +3,10 @@ local socket = require("socket")
 local ssl = require("ssl")
 local _ = require("gettext")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
+local InfoMessage = require("ui/widget/infomessage")
+local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local File = require("./utils/file")
 local Table = require("./table")
@@ -23,7 +26,7 @@ local Device = require("./utils/device")
 --- @field outgoingCapabilities string[]
 --- @field plugin_manager PluginManager
 --- @field connections table
---- @field paired_devices Device[]
+--- @field paired_devices table<string, table>
 --- @field tcp_server unknown
 --- @field plugin_dir string
 --- @field pending_connections table
@@ -80,33 +83,85 @@ local function plugin_dir()
     return current_dir
 end
 
+function KDEConnectPlugin:_load_paired_devices(paired_devices_data)
+    self.paired_devices = {}
+    if type(paired_devices_data) ~= "table" then return end
+
+    for _, entry in ipairs(paired_devices_data) do
+        if type(entry) == "table" and entry.deviceId then
+            self.paired_devices[entry.deviceId] = {
+                deviceId = entry.deviceId,
+                deviceName = entry.deviceName,
+                deviceType = entry.deviceType,
+                ip = entry.ip,
+                protocolVersion = entry.protocolVersion,
+                tcpPort = entry.tcpPort,
+                incomingCapabilities = entry.incomingCapabilities or {},
+                outgoingCapabilities = entry.outgoingCapabilities or {},
+            }
+        end
+    end
+end
+
+function KDEConnectPlugin:_persist_config()
+    local path = plugin_dir() .. "config.json"
+    local paired_devices_payload = {}
+    local index = 0
+    for device_id, device in pairs(self.paired_devices) do
+        if type(device) == "table" and (device.deviceId or device_id) then
+            index = index + 1
+            paired_devices_payload[index] = {
+                deviceId = device.deviceId or device_id,
+                deviceName = device.deviceName,
+                deviceType = device.deviceType,
+                ip = device.ip,
+                protocolVersion = device.protocolVersion,
+                tcpPort = device.tcpPort,
+                incomingCapabilities = device.incomingCapabilities or {},
+                outgoingCapabilities = device.outgoingCapabilities or {},
+            }
+        end
+    end
+
+    local ok = File.write(path, json.encode({
+        device_id = self.device_id,
+        paired_devices = paired_devices_payload,
+    }))
+    if not ok then
+        self:_print("failed to write config")
+    end
+end
+
 function KDEConnectPlugin:_load_config()
     local path = plugin_dir() .. "config.json"
-    self:_print(tostring(debug.getinfo(2, "S").source:match("^@?(.*/)")))
     local data = File.read(path)
     if data then
         local ok, parsed = pcall(json.decode.decode, data)
-        self:_print("parsing: " .. tostring(ok) .. " " .. tostring(parsed))
         if ok and parsed and parsed.device_id then
-            self:_print("ID: " .. parsed.device_id)
             self.device_id = parsed.device_id
-            return
+        end
+        if ok and parsed then
+            self:_load_paired_devices(parsed.paired_devices)
         end
     end
-    math.randomseed(os.time())
-    self.device_id = ""
-    for _ = 1, 32 do
-        self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
+
+    if not self.device_id then
+        math.randomseed(os.time())
+        self.device_id = ""
+        for _ = 1, 32 do
+            self.device_id = self.device_id .. string.format("%x", math.random(0, 15))
+        end
     end
+
     if not (File.exists(plugin_dir() .. "cert.pem") and File.exists(plugin_dir() .. "key.pem")) then
         local status = os.execute("cd " .. plugin_dir() .. '; ./genkey "' .. self.device_id .. '"')
         if status ~= 0 or status == false then
             self:_print("error in executing genkey")
-            -- handle error and show solutions
             return
         end
     end
-    File.write(path, json.encode({ device_id = self.device_id }))
+
+    self:_persist_config()
 end
 
 function KDEConnectPlugin:_init_plugins()
@@ -398,6 +453,113 @@ function KDEConnectPlugin:_poll_tcp_server()
     end)
 end
 
+function KDEConnectPlugin:_remember_paired_device(device_id, accepted)
+    local conn = self.connections[device_id]
+    local dev = conn and conn.device or self.discovered_devices[device_id]
+
+    if accepted then
+        self.paired_devices[device_id] = {
+            deviceId = device_id,
+            deviceName = dev and dev.deviceName or device_id,
+            deviceType = dev and dev.deviceType or "unknown",
+            ip = dev and dev.ip,
+            protocolVersion = dev and dev.protocolVersion,
+            tcpPort = dev and dev.tcpPort,
+            incomingCapabilities = dev and dev.incomingCapabilities or {},
+            outgoingCapabilities = dev and dev.outgoingCapabilities or {},
+        }
+    else
+        self.paired_devices[device_id] = nil
+    end
+
+    self:_persist_config()
+end
+
+function KDEConnectPlugin:show_paired_devices_ui()
+    local paired_devices = {}
+    for _, device in pairs(self.paired_devices) do
+        if type(device) == "table" and device.deviceId then
+            table.insert(paired_devices, device)
+        end
+    end
+
+    table.sort(paired_devices, function(a, b)
+        local a_name = a.deviceName or a.deviceId or ""
+        local b_name = b.deviceName or b.deviceId or ""
+        return a_name < b_name
+    end)
+
+    local buttonDialog = nil
+
+    local buttons = {}
+    ---@param device Device
+    for __, device in ipairs(paired_devices) do
+        local label = device.deviceName or device.deviceId or _("Unknown device")
+        local detail = device.deviceId or ""
+        if device.ip then
+            detail = detail .. " (" .. device.ip .. ")"
+        end
+        table.insert(buttons, {
+            {
+                text = label,
+                callback = function()
+                    UIManager:show(InfoMessage:new {
+                        text = _(label .. "\n" .. (device.deviceId or "") .. "\n" .. (device.ip and ("IP: " .. (device.ip or "unknown")) or "Not connected")),
+                        timeout = 3,
+                        alignment = "center"
+                    })
+                end,
+                hold_callback = function ()
+                    UIManager:show(ConfirmBox:new {
+                        text = _((device.deviceName or "Device") .. " is already paired.\nDo you want to unpair?"),
+                        ok_text = _("Unpair"),
+                        ok_callback = function()
+                            UIManager:close(buttonDialog)
+                            self:_send_pair_response(device.deviceId, false)
+                            KDEConnectPlugin:show_paired_devices_ui()
+                        end,
+                    })
+                end
+            },
+        })
+    end
+
+    if #buttons == 0 then
+        table.insert(buttons, {
+            {
+                text = _("No paired devices yet"),
+                callback = function() end,
+                enabled = false,
+            },
+        })
+    end
+
+    table.insert(buttons, {
+        {
+            text = _("Refresh"),
+            callback = function()
+                self:start_discovery()
+                UIManager:show(Notification:new {
+                    text = _("Refreshing"),
+                })
+            end,
+        },
+        {
+            text = _("Close"),
+            callback = function()
+                UIManager:close(buttonDialog)
+            end,
+        },
+    })
+
+    buttonDialog = ButtonDialog:new {
+        buttons = buttons,
+        width_factor = 0.95,
+        show_parent = self,
+    }
+    UIManager:show(buttonDialog)
+end
+
 function KDEConnectPlugin:_handle_incoming_connection(client)
     client:settimeout(0)
     local line = client:receive("*l")
@@ -655,8 +817,28 @@ function KDEConnectPlugin:_handle_pair(device_id, body)
     end
 end
 
+function KDEConnectPlugin:addToMainMenu(menu_items)
+    menu_items.kdeconnect = {
+        text = _("KDE Connect"),
+        sorting_hint = "network",
+        keep_menu_open = true,
+        -- sub_item_table = { {
+        --     text = _("Paired Devices"),
+        callback = function()
+            self:show_paired_devices_ui()
+        end
+        -- }, {
+        --     text = _("Refresh Discovery"),
+        --     callback = function()
+        --         self:start_discovery()
+        --         -- UIManager:show(InfoMessage:new { text = _("Discovery packet sent."), timeout = 2 })
+        --     end
+        -- } }
+    }
+end
+
 function KDEConnectPlugin:_send_pair_response(device_id, accepted)
-    self.paired_devices[device_id] = accepted
+    self:_remember_paired_device(device_id, accepted)
     local conn = self.connections[device_id]
     if not conn then return end
     self:_send_json(conn, {
@@ -679,6 +861,10 @@ function KDEConnectPlugin:init()
     self:_build_capabilities_from_plugins()
     self:start_discovery()
     self:start_tcp_server()
+    -- UIManager:scheduleIn(1, function()
+    --     self:show_paired_devices_ui()
+    -- end)
+    self.ui.menu:registerToMainMenu(self)
 end
 
 return KDEConnectPlugin
