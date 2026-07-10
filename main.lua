@@ -9,7 +9,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local File = require("./utils/file")
-local Table = require("./table")
+local Table = require("./utils/table")
 local PluginManager = require("./plugins/__init__").PluginManager
 local Device = require("./utils/device")
 
@@ -50,7 +50,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
 }
 
 function KDEConnectPlugin:_print(a)
-    self.udp_socket:sendto(a .. "\n", "10.208.233.146", 11111)
+    self.udp_socket:sendto(a .. "\n", "192.168.1.60", 11111)
 end
 
 -- ────────────────────────── Get IPs ───────────────────────────
