@@ -171,8 +171,8 @@ function KDEConnectPlugin:_init_plugins()
 end
 
 function KDEConnectPlugin:_build_capabilities_from_plugins()
-    self.incomingCapabilities = {}
-    self.outgoingCapabilities = {}
+    self.incomingCapabilities = { "kdeconnect.mock.echo" }
+    self.outgoingCapabilities = { "kdeconnect.mock.echo" }
 
     if not self.plugin_manager then return end
 
