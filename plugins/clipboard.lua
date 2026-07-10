@@ -7,42 +7,31 @@ local _ = require("gettext")
 
 local plugin_id = "kdeconnect.clipboard"
 
+local originalSetClipboardText = Device.input.setClipboardText
+
 local lastClipboardContent = nil
 
----@type string|nil
-local lastview = nil
-
 local checkCopy
-checkCopy = function()
-  local view = UIManager:getNthTopWidget(1)
-  if (view and view.name or nil) ~= lastview then
-    -- delay on view change
-    lastview = (view and view.name or nil)
-    UIManager:scheduleIn(5, checkCopy)
-    return
-  end
-  local content = Device.input.getClipboardText()
-  if content ~= lastClipboardContent and content ~= "" then
-    if lastClipboardContent ~= nil then
-      local devices = PluginManager:get_connected_devices()
-      for _, device in pairs(devices) do
-        device:send("", {
-          content = content
-        }, plugin_id)
-      end
+
+---@param text string
+function Device.input.setClipboardText(text)
+  if text ~= lastClipboardContent and text ~= "" then
+    local devices = PluginManager:get_connected_devices()
+    for _, device in pairs(devices) do
+      device:send("", {
+        content = text
+      }, plugin_id)
     end
-    lastClipboardContent = content
+    lastClipboardContent = text
   end
-  UIManager:scheduleIn(1, checkCopy)
 end
-checkCopy()
 
 ---@param plugin Plugin Plugin instance
 ---@param packet table Incoming packet
 ---@param device Device
 local function clipboard_handler(plugin, packet, device)
   if packet and packet.body and packet.body.content then
-    Device.input.setClipboardText(packet.body.content)
+    originalSetClipboardText(packet.body.content)
     UIManager:show(Notification:new {
       text = _("copied"),
     })
