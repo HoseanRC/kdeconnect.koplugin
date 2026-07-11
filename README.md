@@ -53,9 +53,22 @@ the project splits into 2 parts
 
 [KDE Connect protocol specification](https://github.com/KDE/kdeconnect-meta/blob/master/protocol.md)
 
+## What about Calibre?
+
+It's clear how **Calibre** nails book syncing and it's in many cases better to be used than **KDE Connect** (which can't sync book progress)
+
+however, **KDE Connect** is not designed for e-books. It's designed for an ecosystem!
+
+You can use **Calibre** standalone and get full book sync  
+You can use **KDE Connect** standalone and send your books (PDFs or EPUBs) and use its other functionalities  
+You can also use both **at the same time**
+
+Both projects are different and have their own uses, but they do not contredict each other, so there are no problem in mixing the two.
+
 ## what works?
 
 What works are currently:
+
 1. **Pairing**
 2. **Pinging**
 3. **Notification Sync**
