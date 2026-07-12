@@ -6,6 +6,7 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local ButtonDialog = require("ui/widget/buttondialog")
 local ConfirmBox = require("ui/widget/confirmbox")
 local InfoMessage = require("ui/widget/infomessage")
+local InputDialog = require("ui/widget/inputdialog")
 local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local File = require("./utils/file")
@@ -37,7 +38,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
     tcp_port = 1716,
     udp_socket = socket.udp4(),
     discovered_devices = {},
-    device_name = "KOReader HoseanRC",
+    device_name = "KOReader",
     device_type = "tablet",
     incomingCapabilities = {},
     outgoingCapabilities = {},
@@ -125,6 +126,7 @@ function KDEConnectPlugin:_persist_config()
 
     local ok = File.write(path, json.encode({
         device_id = self.device_id,
+        device_name = self.device_name,
         paired_devices = paired_devices_payload,
     }))
     if not ok then
@@ -139,6 +141,9 @@ function KDEConnectPlugin:_load_config()
         local ok, parsed = pcall(json.decode.decode, data)
         if ok and parsed and parsed.device_id then
             self.device_id = parsed.device_id
+        end
+        if ok and parsed and parsed.device_name then
+            self.device_name = parsed.device_name
         end
         if ok and parsed then
             self:_load_paired_devices(parsed.paired_devices)
@@ -478,6 +483,40 @@ function KDEConnectPlugin:_remember_paired_device(device_id, accepted)
     self:_persist_config()
 end
 
+function KDEConnectPlugin:changeDeviceName()
+    self.name_dialog = InputDialog:new {
+        title = _("Change device name"),
+        hint = _("Enter new device name"),
+        input = self.device_name,
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    callback = function()
+                        UIManager:close(self.name_dialog)
+                    end,
+                },
+                {
+                    text = _("Save"),
+                    callback = function()
+                        local new_name = self.name_dialog:getInputText()
+                        if new_name and #new_name > 0 then
+                            self.device_name = new_name
+                            self:_persist_config()
+                            UIManager:show(Notification:new {
+                                text = _("Device name changed to: ") .. new_name,
+                            })
+                        end
+                        UIManager:close(self.name_dialog)
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(self.name_dialog)
+    self.name_dialog:onShowKeyboard()
+end
+
 function KDEConnectPlugin:show_paired_devices_ui()
     local paired_devices = {}
     for _, device in pairs(self.paired_devices) do
@@ -536,6 +575,16 @@ function KDEConnectPlugin:show_paired_devices_ui()
             },
         })
     end
+
+    table.insert(buttons, {
+        {
+            text = _("Device name: " .. self.device_name),
+            callback = function()
+                self:changeDeviceName()
+                UIManager:close(buttonDialog)
+            end,
+        },
+    })
 
     table.insert(buttons, {
         {
