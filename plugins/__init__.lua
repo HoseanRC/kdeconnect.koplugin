@@ -1,6 +1,8 @@
 -- Plugin handler for KDE Connect plugins
 -- This file provides the base plugin class and plugin management system
 
+local lfs = require("libs/libkoreader-lfs")
+
 --- Base plugin class for all KDE Connect plugins
 ---@class Plugin
 ---@field id string Plugin identifier (e.g., "kdeconnect.mock.echo")
@@ -69,10 +71,10 @@ end
 --- Load plugins from directory
 ---@param plugin_dir string Directory containing plugin files
 function PluginManager:load_from_directory(plugin_dir)
-    local files = require("lfs").attributes(plugin_dir, "mode")
+    local files = lfs.attributes(plugin_dir, "mode")
 
     if files == "directory" then
-        for filename in require("lfs").dir(plugin_dir) do
+        for filename in lfs.dir(plugin_dir) do
             if filename:sub(-4) == ".lua" and filename ~= "__init__.lua" then
                 local plugin_path = plugin_dir .. filename
                 local ok, plugin = pcall(dofile, plugin_path)
