@@ -385,6 +385,9 @@ function KDEConnectPlugin:_process_pending_connection(conn_id)
 end
 
 function KDEConnectPlugin:_receive_discovery_responses()
+    if self.discovered_devices == nil then
+        self.discovered_devices = {}
+    end
     local data, ip = self.udp_socket:receivefrom()
     while data do
         self:_print("got UDP packet: " .. data)
@@ -509,7 +512,7 @@ function KDEConnectPlugin:show_paired_devices_ui()
                         alignment = "center"
                     })
                 end,
-                hold_callback = function ()
+                hold_callback = function()
                     UIManager:show(ConfirmBox:new {
                         text = _((device.deviceName or "Device") .. " is already paired.\nDo you want to unpair?"),
                         ok_text = _("Unpair"),
@@ -853,17 +856,17 @@ end
 local initialised = false
 
 function KDEConnectPlugin:init()
-    if initialised then return end
+    if not initialised then
+        self:_load_config()
+        self:_init_plugins()
+        self:_build_capabilities_from_plugins()
+        self:start_discovery()
+        self:start_tcp_server()
+        -- UIManager:scheduleIn(1, function()
+        --     self:show_paired_devices_ui()
+        -- end)
+    end
     initialised = true
-
-    self:_load_config()
-    self:_init_plugins()
-    self:_build_capabilities_from_plugins()
-    self:start_discovery()
-    self:start_tcp_server()
-    -- UIManager:scheduleIn(1, function()
-    --     self:show_paired_devices_ui()
-    -- end)
     self.ui.menu:registerToMainMenu(self)
 end
 
