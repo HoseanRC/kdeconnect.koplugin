@@ -5,23 +5,26 @@
 ---@class Plugin
 ---@field id string Plugin identifier (e.g., "kdeconnect.mock.echo")
 ---@field name string Human-readable plugin name
----@field direction "incoming"|"outgoing"|"both" Plugin direction
 ---@field handler function Plugin handler function
+---@field incoming_capabilities string[]
+---@field outgoing_capabilities string[]
 local Plugin = {}
 Plugin.__index = Plugin
 
 --- Create a new plugin instance
 ---@param id string Plugin identifier
 ---@param name string Human-readable name
----@param direction "incoming"|"outgoing"|"both" Plugin direction
 ---@param handler function Plugin handler function
+---@param incoming_capabilities string[]
+---@param outgoing_capabilities string[]
 ---@return Plugin
-function Plugin:new(id, name, direction, handler)
+function Plugin:new(id, name, handler, incoming_capabilities, outgoing_capabilities)
     local self = setmetatable({}, Plugin)
     self.id = id
     self.name = name
-    self.direction = direction
     self.handler = handler
+    self.incoming_capabilities = incoming_capabilities
+    self.outgoing_capabilities = outgoing_capabilities
     return self
 end
 

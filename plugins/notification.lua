@@ -36,6 +36,17 @@ end
 return Plugin:new(
   "kdeconnect.notification",
   "Notification",
-  "both",
-  notification_handler
+  notification_handler,
+  {
+    "",
+    -- "request",
+    -- "reply",
+    -- "action",
+  },
+  {
+    "",
+    -- "request",
+    -- "reply",
+    -- "action",
+  }
 )

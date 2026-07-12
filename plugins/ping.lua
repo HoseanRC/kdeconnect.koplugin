@@ -23,6 +23,7 @@ end
 return Plugin:new(
   "kdeconnect.ping",
   "Ping",
-  "both",
-  ping_handler
+  ping_handler,
+  { "" },
+  { "" }
 )

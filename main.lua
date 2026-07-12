@@ -176,17 +176,26 @@ function KDEConnectPlugin:_init_plugins()
 end
 
 function KDEConnectPlugin:_build_capabilities_from_plugins()
-    self.incomingCapabilities = { "kdeconnect.mock.echo" }
-    self.outgoingCapabilities = { "kdeconnect.mock.echo" }
+    self.incomingCapabilities = { }
+    self.outgoingCapabilities = { }
 
     if not self.plugin_manager then return end
 
     for _, plugin in ipairs(self.plugin_manager.plugins) do
-        if plugin.direction == "incoming" or plugin.direction == "both" then
-            table.insert(self.incomingCapabilities, plugin.id)
+        -- Add outgoing capabilities from each plugin
+        if plugin.outgoing_capabilities then
+            for _, capability in ipairs(plugin.outgoing_capabilities) do
+                local capability_id = plugin.id .. (capability == "" and "" or ".") .. capability
+                table.insert(self.outgoingCapabilities, capability_id)
+            end
         end
-        if plugin.direction == "outgoing" or plugin.direction == "both" then
-            table.insert(self.outgoingCapabilities, plugin.id)
+
+        -- Add outgoing capabilities from each plugin
+        if plugin.incoming_capabilities then
+            for _, capability in ipairs(plugin.incoming_capabilities) do
+                local capability_id = plugin.id .. (capability == "" and "" or ".") .. capability
+                table.insert(self.incomingCapabilities, capability_id)
+            end
         end
     end
 

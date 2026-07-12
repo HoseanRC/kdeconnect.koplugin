@@ -43,6 +43,7 @@ end
 return Plugin:new(
   plugin_id,
   "Clipboard",
-  "both",
-  clipboard_handler
+  clipboard_handler,
+  { "", "connect" },
+  { "", "connect" }
 )
