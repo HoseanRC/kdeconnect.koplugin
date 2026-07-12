@@ -654,7 +654,7 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     end
     local full = self:_create_full_identity()
     tls:send(full .. "\n")
-    tls:settimeout(0)
+    tls:settimeout(0.5) -- added 0.5s delay to make sure the packet gets captured
     local remote_line = tls:receive("*l")
     if not remote_line then
         tls:close()
