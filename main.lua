@@ -9,6 +9,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
 local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
+local logger = require("logger")
 local File = require("./utils/file")
 local Table = require("./utils/table")
 local PluginManager = require("./plugins/__init__").PluginManager
@@ -51,7 +52,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
 }
 
 function KDEConnectPlugin:_print(a)
-    self.udp_socket:sendto(a .. "\n", "192.168.1.60", 11111)
+    logger.debug(a)
 end
 
 -- ────────────────────────── Get IPs ───────────────────────────
@@ -836,7 +837,6 @@ function KDEConnectPlugin:_dispatch_packet(device_id, packet)
         -- Let plugin manager handle plugin-specific packets
     else
         if self.plugin_manager then
-            socket.udp4():sendto("#1\n", "10.208.233.146", 11111)
             local conn = self.connections[device_id]
             local handled = self.plugin_manager:handle_packet(packet, self.discovered_devices[device_id], conn)
             if handled then
