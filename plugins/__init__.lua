@@ -37,7 +37,7 @@ end
 ---@param packet table Packet to check
 ---@return boolean
 function Plugin:can_handle(packet)
-    return packet.type == self.id
+    return packet.type:sub(1, #self.id) == self.id
 end
 
 --- Handle incoming packet
