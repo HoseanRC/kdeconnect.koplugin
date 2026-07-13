@@ -3,9 +3,13 @@ local socket = require("socket")
 local ssl = require("ssl")
 local UIManager = require("ui/uimanager")
 local Notification = require("ui/widget/notification")
+local FileChooser = require("ui/widget/filechooser")
+local InfoMessage = require("ui/widget/infomessage")
+local ButtonDialog = require("ui/widget/buttondialog")
 local _ = require("gettext")
 
 local Plugin = require("./plugins/__init__").Plugin
+local PluginManager = require("./plugins/__init__").PluginManager
 
 local plugin_id = "kdeconnect.share"
 
@@ -331,6 +335,69 @@ local function share_handler(plugin, packet, device)
     end
 end
 
+local function file_chooser_share()
+    local isConnected = false
+    for _i, device in pairs(PluginManager.devices) do
+        if device.connection then
+            isConnected = true
+            break
+        end
+    end
+    if not isConnected then
+        UIManager:show(InfoMessage:new {
+            text = _("No devices are connected"),
+            timeout = 3,
+        })
+        return
+    end
+    local filechooser = FileChooser:new {
+        -- path = "/",
+        select_directory = false, -- Don't select directories
+        show_files = true,
+    }
+    function filechooser:onFileSelect(file)
+        UIManager:close(filechooser)
+        local paired_devices = {}
+        for _i, device in pairs(PluginManager.devices) do
+            if device.deviceId then
+                table.insert(paired_devices, device)
+            end
+        end
+
+        table.sort(paired_devices, function(a, b)
+            local a_name = a.deviceName or a.deviceId or ""
+            local b_name = b.deviceName or b.deviceId or ""
+            return a_name < b_name
+        end)
+
+        local buttonDialog = nil
+
+        local buttons = {}
+        ---@param device Device
+        for __i, device in ipairs(paired_devices) do
+            local label = device.deviceName or device.deviceId or _("Unknown device")
+            table.insert(buttons, {
+                {
+                    text = label,
+                    callback = function()
+                        UIManager:close(buttonDialog)
+                        share_file(device, file.path)
+                    end,
+                },
+            })
+        end
+
+        buttonDialog = ButtonDialog:new {
+            title = _("Choose a device to send the file to"),
+            buttons = buttons,
+            width_factor = 0.95,
+        }
+
+        UIManager:show(buttonDialog)
+    end
+
+    UIManager:show(filechooser)
+end
 --- Create and return the share plugin
 ---@return Plugin
 return Plugin:new(
@@ -338,5 +405,12 @@ return Plugin:new(
     "Share",
     share_handler,
     { "request", "request.update" },
-    { "request" }
+    { "request" },
+    {
+        kdeconnect_share = {
+            text = _("Share file to device..."),
+            sorting_hint = "network",
+            callback = file_chooser_share
+        }
+    }
 )
