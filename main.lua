@@ -896,6 +896,16 @@ function KDEConnectPlugin:addToMainMenu(menu_items)
         --     end
         -- } }
     }
+    
+    if self.plugin_manager and self.plugin_manager.plugins then
+        for _, plugin in ipairs(self.plugin_manager.plugins) do
+            if plugin.menus and type(plugin.menus) == "table" then
+                for menu_key, menu_item in pairs(plugin.menus) do
+                    menu_items[menu_key] = menu_item
+                end
+            end
+        end
+    end
 end
 
 function KDEConnectPlugin:_send_pair_response(device_id, accepted)

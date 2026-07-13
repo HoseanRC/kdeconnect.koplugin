@@ -10,6 +10,7 @@ local lfs = require("libs/libkoreader-lfs")
 ---@field handler function Plugin handler function
 ---@field incoming_capabilities string[]
 ---@field outgoing_capabilities string[]
+---@field menus table Menu items for main menu
 local Plugin = {}
 Plugin.__index = Plugin
 
@@ -19,14 +20,16 @@ Plugin.__index = Plugin
 ---@param handler function Plugin handler function
 ---@param incoming_capabilities string[]
 ---@param outgoing_capabilities string[]
+---@param menus table|nil Menu items for main menu
 ---@return Plugin
-function Plugin:new(id, name, handler, incoming_capabilities, outgoing_capabilities)
+function Plugin:new(id, name, handler, incoming_capabilities, outgoing_capabilities, menus)
     local self = setmetatable({}, Plugin)
     self.id = id
     self.name = name
     self.handler = handler
     self.incoming_capabilities = incoming_capabilities
     self.outgoing_capabilities = outgoing_capabilities
+    self.menus = menus or {}
     return self
 end
 
