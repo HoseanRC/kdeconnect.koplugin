@@ -621,6 +621,7 @@ function KDEConnectPlugin:show_paired_devices_ui()
 end
 
 function KDEConnectPlugin:_handle_incoming_connection(client)
+    local ip = client:getpeername()
     client:settimeout(0)
     local line = client:receive("*l")
     if not line then
@@ -670,7 +671,7 @@ function KDEConnectPlugin:_handle_incoming_connection(client)
     tls:send(packet_str)
     local remote = remote_pkt.body
     local dev = Device:new(
-        client:getpeername(),
+        ip,
         client_id,
         remote.deviceName or body.deviceName or client_id,
         remote.deviceType,
