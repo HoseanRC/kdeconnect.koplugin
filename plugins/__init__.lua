@@ -1,7 +1,17 @@
 -- Plugin handler for KDE Connect plugins
 -- This file provides the base plugin class and plugin management system
 
+local json = require("json")
+local File = require("./utils/file")
 local lfs = require("libs/libkoreader-lfs")
+
+--- Base plugin manager
+---@class PluginManager
+---@field plugins table List of loaded plugins
+---@field devices Device[] Map of device_id -> Device
+---@field plugin_dir string Path of the plugin directory
+local PluginManager = {}
+PluginManager.__index = PluginManager
 
 --- Base plugin class for all KDE Connect plugins
 ---@class Plugin
@@ -11,6 +21,7 @@ local lfs = require("libs/libkoreader-lfs")
 ---@field incoming_capabilities string[]
 ---@field outgoing_capabilities string[]
 ---@field menus table Menu items for main menu
+---@field config table
 local Plugin = {}
 Plugin.__index = Plugin
 
@@ -30,6 +41,12 @@ function Plugin:new(id, name, handler, incoming_capabilities, outgoing_capabilit
     self.incoming_capabilities = incoming_capabilities
     self.outgoing_capabilities = outgoing_capabilities
     self.menus = menus or {}
+    local file = File.read(PluginManager.plugin_dir .. "config.json")
+    local ok, parsed = pcall(json.decode.decode, file)
+    if not ok then parsed = {} end
+    if not parsed.plugins then parsed.plugins = {} end
+
+    self.config = parsed.plugins[name] or {}
     return self
 end
 
@@ -49,13 +66,6 @@ function Plugin:handle(packet, device)
     end
 end
 
---- Base plugin manager
----@class PluginManager
----@field plugins table List of loaded plugins
----@field devices Device[] Map of device_id -> Device
-local PluginManager = {}
-PluginManager.__index = PluginManager
-
 --- Create a new plugin manager
 ---@return PluginManager
 function PluginManager:new()
@@ -63,6 +73,15 @@ function PluginManager:new()
     self.plugins = {}
     self.devices = {}
     return self
+end
+
+function Plugin:save()
+    local file = File.read(PluginManager.plugin_dir .. "config.json")
+    local ok, parsed = pcall(json.decode.decode, file)
+    if not ok then parsed = {} end
+    if not parsed.plugins then parsed.plugins = {} end
+    parsed.plugins[self.name] = self.config
+    File.write(PluginManager.plugin_dir .. "config.json", json.encode(parsed))
 end
 
 --- Register a plugin

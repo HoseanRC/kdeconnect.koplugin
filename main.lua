@@ -69,20 +69,18 @@ local function getips()
     return ips
 end
 
-local current_dir = nil
-
 ---
 ---returns current dir path
 ---
 ---@return string
 ---@nodiscard
 local function plugin_dir()
-    if current_dir then
-        return current_dir
+    if PluginManager.plugin_dir then
+        return PluginManager.plugin_dir
     end
     local info = debug.getinfo(2, "S")
-    current_dir = info.source:match("^@?(.*/)")
-    return current_dir
+    PluginManager.plugin_dir = info.source:match("^@?(.*/)")
+    return PluginManager.plugin_dir
 end
 
 function KDEConnectPlugin:_load_paired_devices(paired_devices_data)
