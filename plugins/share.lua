@@ -6,6 +6,7 @@ local Notification = require("ui/widget/notification")
 local FileChooser = require("ui/widget/filechooser")
 local InfoMessage = require("ui/widget/infomessage")
 local ButtonDialog = require("ui/widget/buttondialog")
+local PathChooser = require("ui/widget/pathchooser")
 local _ = require("gettext")
 
 local Plugin = require("./plugins/__init__").Plugin
@@ -13,7 +14,30 @@ local PluginManager = require("./plugins/__init__").PluginManager
 
 local plugin_id = "kdeconnect.share"
 
+---@type Plugin
+local plugin = nil
+
 local payload_transfers = {}
+
+local function select_download_directory()
+    local chooser = nil
+    local stored_path = plugin and (plugin.config and plugin.config.download_path or nil) or nil
+    chooser = PathChooser:new {
+        path = stored_path or (PluginManager.plugin_dir .. "received_files"),
+        title = _("Select download directory"),
+        onConfirm = function(path)
+            if plugin then
+                if not plugin.config then
+                    plugin.config = {}
+                end
+                plugin.config.download_path = path .. "/"
+                plugin:save()
+            end
+            UIManager:close(chooser)
+        end,
+    }
+    UIManager:show(chooser)
+end
 
 local function read_file_binary(path)
     local f = io.open(path, "rb")
@@ -31,14 +55,11 @@ local function write_file_binary(path, data)
     return true
 end
 
-local function get_plugin_dir()
-    local info = debug.getinfo(1, "S")
-    local dir = info.source:match("^@?(.*/)")
-    return dir:match("(.*/)plugins/") or dir
-end
-
 local function get_download_path(filename)
-    local base = get_plugin_dir() .. "received_files/"
+    local base = PluginManager.plugin_dir .. "received_files/"
+    if plugin and plugin.config and plugin.config.download_path then
+        base = plugin.config.download_path
+    end
     os.execute("mkdir -p \"" .. base .. "\"")
     local path = base .. filename
     local stem = filename:match("(.+)%.[^.]*$") or filename
@@ -72,7 +93,7 @@ local function process_payload_receive(transfer_id)
     end
 
     if t.state == "wrap_tls" then
-        local dir = get_plugin_dir()
+        local dir = PluginManager.plugin_dir
         local tls_conn, err = ssl.wrap(t.client, {
             mode = "client",
             protocol = "tlsv1_2",
@@ -174,7 +195,7 @@ local function process_payload_send_accept(transfer_id)
     end
 
     if t.state == "wrap_tls" then
-        local dir = get_plugin_dir()
+        local dir = PluginManager.plugin_dir
         local tls_conn, err = ssl.wrap(t.client, {
             mode = "server",
             protocol = "tlsv1_2",
@@ -351,7 +372,7 @@ local function file_chooser_share()
         return
     end
     local filechooser = FileChooser:new {
-        -- path = "/",
+        path = plugin.config.download_path,
         select_directory = false, -- Don't select directories
         show_files = true,
     }
@@ -398,9 +419,8 @@ local function file_chooser_share()
 
     UIManager:show(filechooser)
 end
---- Create and return the share plugin
----@return Plugin
-return Plugin:new(
+
+plugin = Plugin:new(
     plugin_id,
     "Share",
     share_handler,
@@ -411,6 +431,13 @@ return Plugin:new(
             text = _("Share file to device..."),
             sorting_hint = "network",
             callback = file_chooser_share
+        },
+        kdeconnect_share_settings = {
+            text = _("Select download directory..."),
+            sorting_hint = "network",
+            callback = select_download_directory
         }
     }
 )
+
+return plugin
