@@ -41,12 +41,11 @@ function Plugin:new(id, name, handler, incoming_capabilities, outgoing_capabilit
     self.incoming_capabilities = incoming_capabilities
     self.outgoing_capabilities = outgoing_capabilities
     self.menus = menus or {}
-    local file = File.read(PluginManager.plugin_dir .. "config.json")
+    local file = File.read(PluginManager.plugin_dir .. "plugins_config.json")
     local ok, parsed = pcall(json.decode.decode, file)
     if not ok then parsed = {} end
-    if not parsed.plugins then parsed.plugins = {} end
 
-    self.config = parsed.plugins[name] or {}
+    self.config = parsed[name] or {}
     return self
 end
 
@@ -76,12 +75,11 @@ function PluginManager:new()
 end
 
 function Plugin:save()
-    local file = File.read(PluginManager.plugin_dir .. "config.json")
+    local file = File.read(PluginManager.plugin_dir .. "plugins_config.json")
     local ok, parsed = pcall(json.decode.decode, file)
     if not ok then parsed = {} end
-    if not parsed.plugins then parsed.plugins = {} end
-    parsed.plugins[self.name] = self.config
-    File.write(PluginManager.plugin_dir .. "config.json", json.encode(parsed))
+    parsed[self.name] = self.config
+    File.write(PluginManager.plugin_dir .. "plugins_config.json", json.encode(parsed))
 end
 
 --- Register a plugin
