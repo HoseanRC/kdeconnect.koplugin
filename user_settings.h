@@ -284,7 +284,7 @@ extern "C"
 #define WOLFSSL_BASE64_ENCODE
 #undef WOLFSSL_CAAM
 /* #undef WOLFSSL_CAAM */
-#undef WOLFSSL_CERT_EXT
+#define WOLFSSL_CERT_EXT
 /* #undef WOLFSSL_CERT_EXT */
 #define WOLFSSL_CERT_GEN
 /* #undef WOLFSSL_CERT_GEN */
