@@ -47,6 +47,8 @@ int main(int argc, char *argv[])
         strncpy(cert.subject.commonName, argv[1], CTC_NAME_SIZE);
     }
     cert.daysValid = 365 * 9;
+    cert.sigType = CTC_SHA256wECDSA;
+    cert.isCA = 1;
 
     ret = wc_ecc_make_key_ex(&rng, ECC_CURVE_SZ, &key, ECC_CURVE_ID);
     if (ret != 0)
