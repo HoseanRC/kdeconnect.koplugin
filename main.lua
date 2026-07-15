@@ -37,7 +37,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
     is_doc_only = false,
     protocol_version = 8,
     tcp_port = 1716,
-    udp_socket = socket.udp4(),
+    udp_socket = nil,
     discovered_devices = {},
     device_name = "KOReader",
     device_type = "tablet",
@@ -52,7 +52,7 @@ local KDEConnectPlugin = WidgetContainer:extend {
 }
 
 function KDEConnectPlugin:_print(a)
-    logger.debug(a)
+    logger.info("[kdeconnect] "..a)
 end
 
 -- ────────────────────────── Get IPs ───────────────────────────
@@ -244,6 +244,7 @@ function KDEConnectPlugin:start_discovery()
     self:_print("starting UDP")
     if not self.udp_socket_start then
         self.udp_socket = socket.udp4()
+        self.udp_socket:setoption("reuseaddr", true)
         local _, err = self.udp_socket:setsockname("*", 1716)
         if err then self:_print("UDP setsockname error: " .. err) end
         self.udp_socket_start = true
@@ -436,6 +437,14 @@ function KDEConnectPlugin:_receive_discovery_responses()
     UIManager:scheduleIn(0.5, function()
         self:_receive_discovery_responses()
     end)
+end
+
+-- ──────────────────────────── Firewall setting ────────────────────────────
+
+function KDEConnectPlugin:set_firewall_rules()
+    self:_print("Setting firewall rule to open port 1716")
+    os.execute("iptables -I INPUT -i wlan0 -p tcp --dport 1716 -m state --state NEW,ESTABLISHED -j ACCEPT 2>/dev/null")
+    os.execute("iptables -I INPUT -i wlan0 -p udp --dport 1716 -j ACCEPT 2>/dev/null")
 end
 
 -- ──────────────────────────── TCP Server ────────────────────────────
@@ -895,7 +904,7 @@ function KDEConnectPlugin:addToMainMenu(menu_items)
         --     end
         -- } }
     }
-    
+
     if self.plugin_manager and self.plugin_manager.plugins then
         for _, plugin in ipairs(self.plugin_manager.plugins) do
             if plugin.menus and type(plugin.menus) == "table" then
@@ -927,6 +936,7 @@ function KDEConnectPlugin:init()
         self:_load_config()
         self:_init_plugins()
         self:_build_capabilities_from_plugins()
+        self:set_firewall_rules()
         self:start_discovery()
         self:start_tcp_server()
         -- UIManager:scheduleIn(1, function()
