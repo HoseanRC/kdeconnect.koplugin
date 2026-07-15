@@ -1,3 +1,3 @@
-[submodule "koreader"]
-	path = koreader
-	url = https://github.com/koreader/koreader.git
+[submodule "wolfssl"]
+	path = wolfssl
+	url = https://github.com/wolfSSL/wolfssl.git
