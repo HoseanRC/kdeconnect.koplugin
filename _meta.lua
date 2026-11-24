@@ -3,5 +3,5 @@ return {
     name = "kdeconnect",
     fullname = _("KDE Connect"),
     description = _([[KDE Connect plugin for KOReader.]]),
-    version = "0.2.1"
+    version = "0.2.2"
 }
