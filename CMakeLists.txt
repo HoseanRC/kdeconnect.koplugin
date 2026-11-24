@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 
 # Optimize for size
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -flto=auto -Os")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -flto=auto -Os -m32")
     # set(CMAKE_EXE_LINKER_FLAGS "-flto -s")
 endif()
 

@@ -39,22 +39,6 @@ local function select_download_directory()
     UIManager:show(chooser)
 end
 
-local function read_file_binary(path)
-    local f = io.open(path, "rb")
-    if not f then return nil end
-    local content = f:read("*a")
-    f:close()
-    return content
-end
-
-local function write_file_binary(path, data)
-    local f = io.open(path, "wb")
-    if not f then return false end
-    f:write(data)
-    f:close()
-    return true
-end
-
 local function get_download_path(filename)
     local base = PluginManager.plugin_dir .. "received_files/"
     if plugin and plugin.config and plugin.config.download_path then
@@ -79,6 +63,8 @@ local function process_payload_receive(transfer_id)
     if t.state == "connect" then
         local client, err = socket.connect(t.ip, t.port)
         if not client then
+            t.file:close()
+            os.remove(t.save_path)
             UIManager:show(Notification:new {
                 text = _("File transfer connect failed: ") .. (err or "unknown"),
             })
@@ -102,6 +88,8 @@ local function process_payload_receive(transfer_id)
             verify = "none",
         })
         if not tls_conn then
+            t.file:close()
+            os.remove(t.save_path)
             t.client:close()
             payload_transfers[transfer_id] = nil
             return
@@ -124,6 +112,8 @@ local function process_payload_receive(transfer_id)
             UIManager:scheduleIn(0.1, function() process_payload_receive(transfer_id) end)
             return
         end
+        t.file:close()
+        os.remove(t.save_path)
         t.client:close()
         payload_transfers[transfer_id] = nil
         return
@@ -135,11 +125,10 @@ local function process_payload_receive(transfer_id)
         local chunk_size = math.min(remaining, 8192)
         local data, err = t.tls:receive(chunk_size)
         if data then
-            t.data = t.data .. data
+            t.file:write(data)
             t.received = t.received + #data
             if t.received >= t.payload_size then
-                local save_path = get_download_path(t.filename)
-                write_file_binary(save_path, t.data)
+                t.file:close()
                 UIManager:show(Notification:new {
                     text = _("Received file: ") .. t.filename,
                 })
@@ -153,6 +142,8 @@ local function process_payload_receive(transfer_id)
             UIManager:scheduleIn(0.1, function() process_payload_receive(transfer_id) end)
             return
         end
+        t.file:close()
+        os.remove(t.save_path)
         t.client:close()
         payload_transfers[transfer_id] = nil
         return
@@ -160,6 +151,14 @@ local function process_payload_receive(transfer_id)
 end
 
 local function download_payload(device, port, payload_size, filename)
+    local save_path = get_download_path(filename)
+    local f = io.open(save_path, "wb")
+    if not f then
+        UIManager:show(Notification:new {
+            text = _("Could not open file for writing: ") .. save_path,
+        })
+        return
+    end
     local transfer_id = "dl_" .. device.deviceId .. "_" .. tostring(os.time())
     payload_transfers[transfer_id] = {
         state = "connect",
@@ -167,7 +166,8 @@ local function download_payload(device, port, payload_size, filename)
         port = port,
         payload_size = payload_size,
         filename = filename,
-        data = "",
+        save_path = save_path,
+        file = f,
         received = 0,
     }
     UIManager:show(Notification:new {
@@ -204,6 +204,7 @@ local function process_payload_send_accept(transfer_id)
             verify = "none",
         })
         if not tls_conn then
+            if t.file then t.file:close() end
             t.client:close()
             t.server:close()
             payload_transfers[transfer_id] = nil
@@ -227,6 +228,7 @@ local function process_payload_send_accept(transfer_id)
             UIManager:scheduleIn(0.1, function() process_payload_send_accept(transfer_id) end)
             return
         end
+        if t.file then t.file:close() end
         t.client:close()
         t.server:close()
         payload_transfers[transfer_id] = nil
@@ -237,11 +239,12 @@ local function process_payload_send_accept(transfer_id)
         t.tls:settimeout(0)
         local remaining = t.payload_size - t.offset
         local chunk_size = math.min(remaining, 8192)
-        local chunk = t.content:sub(t.offset + 1, t.offset + chunk_size)
+        local chunk = t.file:read(chunk_size) or ""
         local ok, err = t.tls:send(chunk)
         if ok then
             t.offset = t.offset + #chunk
             if t.offset >= t.payload_size then
+                t.file:close()
                 t.tls:close()
                 t.client:close()
                 t.server:close()
@@ -258,6 +261,7 @@ local function process_payload_send_accept(transfer_id)
             UIManager:scheduleIn(0.1, function() process_payload_send_accept(transfer_id) end)
             return
         end
+        t.file:close()
         t.client:close()
         t.server:close()
         payload_transfers[transfer_id] = nil
@@ -271,19 +275,22 @@ local function share_file(device, filepath)
         filename = filepath
     end
 
-    local content = read_file_binary(filepath)
-    if not content then
+    local f = io.open(filepath, "rb")
+    if not f then
         UIManager:show(Notification:new {
             text = _("Could not read file: ") .. filepath,
         })
         return
     end
+    local size = f:seek("end")
+    f:seek("set", 0)
 
     local server = socket.tcp4()
     server:setoption("reuseaddr", true)
     server:settimeout(0)
     local ok, err = server:setsockname("*", 0)
     if not ok then
+        f:close()
         server:close()
         UIManager:show(Notification:new {
             text = _("Failed to create transfer socket: ") .. tostring(err),
@@ -292,6 +299,7 @@ local function share_file(device, filepath)
     end
     ok, err = server:listen(1)
     if not ok then
+        f:close()
         server:close()
         UIManager:show(Notification:new {
             text = _("Failed to listen: ") .. tostring(err),
@@ -305,8 +313,8 @@ local function share_file(device, filepath)
     payload_transfers[transfer_id] = {
         state = "accepting",
         server = server,
-        content = content,
-        payload_size = #content,
+        file = f,
+        payload_size = size,
         filename = filename,
         offset = 0,
     }
@@ -317,7 +325,7 @@ local function share_file(device, filepath)
         body = {
             filename = filename,
         },
-        payloadSize = #content,
+        payloadSize = size,
         payloadTransferInfo = {
             port = port,
         },
@@ -325,6 +333,7 @@ local function share_file(device, filepath)
     local encoded = json.encode(packet)
     local ok, err = device.connection.tls:send(encoded .. "\n")
     if not ok then
+        f:close()
         server:close()
         payload_transfers[transfer_id] = nil
         UIManager:show(Notification:new {
